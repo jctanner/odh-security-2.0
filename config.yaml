@@ -1,0 +1,73 @@
+# OpenDataHub Gateway API Migration Configuration
+# This file defines project-wide settings for the security 2.0 migration
+
+# GitHub Configuration
+github:
+  # Organization where all forks will be created
+  fork_org: "jctanner-opendatahub-io"
+  
+  # Branch name to use across all forked repositories for this project
+  branch_name: "gateway-api-migration"
+  
+  # Base branch to create migration branches from (usually main or master)
+  base_branch: "main"
+
+# Target repositories for migration
+# These are the opendatahub-io repositories that need Gateway API migration
+target_repositories:
+  - "opendatahub-io/opendatahub-operator"
+  - "opendatahub-io/odh-dashboard"
+  - "opendatahub-io/odh-model-controller"
+  - "opendatahub-io/kubeflow"
+  - "opendatahub-io/notebook-controller"
+  - "opendatahub-io/notebooks"
+  - "opendatahub-io/odh-manifest"
+
+# Container Registry Configuration
+registry:
+  # Custom registry URL for built images
+  url: "registry.tannerjc.net"
+  
+  # Namespace/organization within the registry
+  namespace: "odh-security-2.0"
+  
+  # Default image tag
+  tag: "latest"
+
+# Build Configuration
+# Default settings for the build-operator command
+build:
+  # Use local checkouts for manifest sources instead of cloning
+  local: true
+  
+  # Use feature branch from config.yaml instead of main branch
+  use_branch: true
+  
+  # Build container image instead of binary
+  image: true
+  
+  # Use custom registry settings from config.yaml
+  custom_registry: true
+  
+  # Only fetch manifests, do not build binary or image
+  manifests_only: false
+
+# Migration settings
+migration:
+  # Whether to automatically create branches after forking
+  auto_create_branch: true
+  
+  # Whether to set up upstream remotes automatically
+  setup_upstream: true
+  
+  # Commit message template for migration changes
+  commit_message_template: "Migrate to Gateway API: {description}"
+  
+  # Pull request title template
+  pr_title_template: "Gateway API Migration: {repository}"
+
+# Project metadata
+project:
+  name: "OpenDataHub Gateway API Migration"
+  version: "2.0"
+  description: "Migration of OpenDataHub networking from current implementation to Gateway API" 
