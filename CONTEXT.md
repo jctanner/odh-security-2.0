@@ -390,6 +390,18 @@ This project has established a comprehensive development infrastructure for migr
     - DSC configured for minimal deployment with only dashboard and workbenches enabled
     - Date: Current session
 
+39. **Gateway API Migration Implementation and RBAC Fix** (Completed)
+    - Implemented Gateway API migration overlay structure with /odh-gateway path
+    - Created core-bases/gateway-api directory with HTTPRoute resource for dashboard routing
+    - Modified dashboard deployment to remove oauth-proxy sidecar and target port 8080 directly
+    - Identified DSC readiness issue: operator lacked RBAC permissions for Gateway API HTTPRoute resources
+    - Root cause: operator getting "httproutes.gateway.networking.k8s.io is forbidden" errors
+    - Fixed by adding gateway.networking.k8s.io/httproutes permissions to operator RBAC role
+    - Added complete CRUD and watch permissions for HTTPRoute resources in config/rbac/role.yaml
+    - Dashboard pods running successfully, operator permissions now allow proper Gateway API resource monitoring
+    - Ready for operator rebuild/redeploy to complete Gateway API migration testing
+    - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -514,6 +526,7 @@ This project has established a comprehensive development infrastructure for migr
 - **Target Architecture**: Gateway API (migration approach to be determined)
 - **Dependencies**: GitHub CLI ('gh'), Python 3.8+, ansible-core, PyYAML, requests, podman/docker, kubectl (for deployment tasks)
 - **Testing**: Build system fully tested and operational, deployment system tested with live OpenDataHub cluster, new classes tested for import compatibility
+- **Gateway API Implementation**: Gateway API overlay structure created with HTTPRoute resources, oauth-proxy sidecar removed, operator RBAC permissions updated for Gateway API resources
 
 ## Architecture Decisions
 *Record significant technical decisions and rationale*
@@ -577,17 +590,19 @@ This project has established a comprehensive development infrastructure for migr
    - ✅ Created complete cleanup system for development iterations
    - ✅ All deployment workflows operational with live output streaming
 
-5. **Migration Strategy Development** (Next Phase)
-   - Define Gateway API migration approach based on analysis
-   - Create step-by-step migration plan with validation checkpoints
-   - Establish testing strategy for networking changes
-   - Use established build-deploy-cleanup workflow for iterative development
+5. **Gateway API Migration Testing** (In Progress)
+   - Operator rebuild/redeploy required to apply HTTPRoute RBAC permissions fix
+   - Test DSC transition to Ready state with proper Gateway API permissions
+   - Validate HTTPRoute resource creation and dashboard accessibility
+   - Verify oauth-proxy removal doesn't break dashboard functionality
+   - Test dashboard access through Gateway API routing instead of OpenShift Route
 
-6. **Implementation and Testing** (Future)
-   - Begin Gateway API migration in opendatahub-operator using established workflow
-   - Coordinate changes across dependent repositories
-   - Validate networking functionality throughout migration using deployment system
+6. **Gateway API Migration Completion** (Future)
+   - Document Gateway API migration approach and validation results
+   - Create step-by-step migration guide with troubleshooting steps
+   - Coordinate changes across dependent repositories if needed
+   - Validate networking functionality across all OpenDataHub components
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-14 17:55 UTC - OpenDataHub Deployment System Complete* 
+*Last Updated: 2025-01-14 19:40 UTC - Gateway API Migration Implementation and RBAC Fix Complete* 
