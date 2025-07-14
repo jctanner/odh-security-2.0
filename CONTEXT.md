@@ -417,6 +417,19 @@ This project has established a comprehensive development infrastructure for migr
     - Full compilation and build testing successful - Gateway controller ready for deployment
     - Date: Current session
 
+41. **DSCI Null Phase Issue Resolution** (Completed)
+    - Identified root cause: DSCI controller failing to create Auth resource due to validation webhook rejection
+    - Problem: Auth validation webhook rejected empty AdminGroups when platform was OpenDataHubGateway
+    - Platform detection returns OpenDataHubGateway when DSCI has networking.mode: "gateway-api"
+    - Fixed missing adminGroups map entry for OpenDataHubGateway platform in auth.go
+    - Resolved operator deployment issues: scaled from 3 to 1 replica to fix leader election conflicts
+    - Added missing Gateway API RBAC permissions to controller-manager cluster role
+    - Installed cert-manager CRDs and controllers for certificate management
+    - Applied Gateway service CRD to make it available for the controller
+    - Updated cluster role binding with proper Gateway API and cert-manager permissions
+    - DSCI now processes successfully with gateway-api networking mode enabled
+    - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -541,7 +554,7 @@ This project has established a comprehensive development infrastructure for migr
 - **Target Architecture**: Gateway API (migration approach to be determined)
 - **Dependencies**: GitHub CLI ('gh'), Python 3.8+, ansible-core, PyYAML, requests, podman/docker, kubectl (for deployment tasks)
 - **Testing**: Build system fully tested and operational, deployment system tested with live OpenDataHub cluster, new classes tested for import compatibility
-- **Gateway API Implementation**: Complete Gateway controller implementation with Gateway API resource creation, HTTPRoute resources, oauth-proxy sidecar removed, operator RBAC permissions updated for Gateway API resources
+- **Gateway API Implementation**: Complete Gateway controller implementation with Gateway API resource creation, HTTPRoute resources, oauth-proxy sidecar removed, operator RBAC permissions updated for Gateway API resources, DSCI null phase issue resolved with proper Auth resource creation
 
 ## Architecture Decisions
 *Record significant technical decisions and rationale*
@@ -575,15 +588,28 @@ This project has established a comprehensive development infrastructure for migr
    - HTTPS origins caused authentication issues with private/missing repositories
    - ✅ Resolved by repository-specific base branch handling and SSH origins for forks
 
+4. **DSCI Null Phase Issue** (✅ Resolved)
+   - DSCI resource stuck in null phase, preventing OpenDataHub initialization
+   - Root cause: Auth validation webhook rejecting empty AdminGroups for OpenDataHubGateway platform
+   - Platform detection logic returns OpenDataHubGateway when networking.mode: "gateway-api"
+   - Missing adminGroups map entry for OpenDataHubGateway platform caused empty string in AdminGroups
+   - Multiple deployment issues: leader election conflicts, missing RBAC permissions, missing CRDs
+   - ✅ Resolved by adding OpenDataHubGateway adminGroups entry, fixing operator deployment, and adding required permissions
+
 ## Next Steps
 *Immediate planned actions*
 
-1. **Gateway API Controller Testing** (Ready to Begin)
-   - Deploy Gateway controller with DSCI networking.mode: "gateway-api"
-   - Verify Gateway API resource creation and configuration
-   - Test namespace labeling and HTTPRoute security restrictions
-   - Validate platform-aware domain resolution functionality
-   - Test TLS certificate integration and Gateway listeners
+1. **Gateway API Controller RBAC Fix** (In Progress)
+   - ✅ Deploy Gateway controller with DSCI networking.mode: "gateway-api"
+   - ✅ Identified and resolved DSCI null phase issue
+   - ✅ Fixed Auth resource creation for OpenDataHubGateway platform
+   - ✅ Resolved operator permissions and deployment issues
+   - ✅ **PROBLEM_1.md Created**: Documented persistent RBAC permissions issue
+   - ✅ **Root Cause Identified**: Missing RBAC permissions in config/rbac/role.yaml for Gateway API and cert-manager resources
+   - 🔄 **Next**: Add required RBAC rules to role.yaml and rebuild/redeploy
+   - 🔄 Test namespace labeling and HTTPRoute security restrictions
+   - 🔄 Validate platform-aware domain resolution functionality
+   - 🔄 Test TLS certificate integration and Gateway listeners
 
 2. **Repository Dependency Management** (✅ Complete)
    - ✅ Created setup-forks subcommand to fork all 15 required repositories
@@ -620,4 +646,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-14 21:15 UTC - Gateway Controller Implementation Complete* 
+*Last Updated: 2025-01-14 21:45 UTC - DSCI Null Phase Issue Resolved* 

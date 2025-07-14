@@ -63,6 +63,13 @@
     cmd: "kubectl apply -f /tmp/dsci-config.yaml -n {{ namespace }}"
   register: deploy_dsci_result
 
+# WORKAROUND!!!
+- name: "Apply updated RBAC permissions"
+  live_shell:
+    cmd: "kustomize build config/default | kubectl apply -f -"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  register: apply_rbac_result
+
 - name: "Wait for DSCI to be ready"
   live_shell:
     cmd: "kubectl wait --for=condition=Available dscinitializations.dscinitialization.opendatahub.io/{{ dsci_config.name }} -n {{ namespace }} --timeout={{ wait_timeout }}s"
