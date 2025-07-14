@@ -13,20 +13,18 @@ includes:
 steps:
   - name: "Check repository status"
     type: "tool"
-    command: "forks-status"
-    args: 
-      - "--dirty"
+    command: "forks-status --dirty"
     
   - name: "Build manifests from local checkouts"
-    type: "tool"
-    command: "build-operator"
-    args:
-      - "--local"
-      - "--use-branch"
-      - "--manifests-only"
+    type: "shell"
+    command: "make get-manifests-local-branch"
+    working_directory: "${LOCAL_CHECKOUTS_DIR}/opendatahub-operator"
+    env:
+      FORK_ORG: "${FORK_ORG}"
+      BRANCH_NAME: "${BRANCH_NAME}"
+      LOCAL_MODE: "true"
+      LOCAL_CHECKOUTS_DIR: "${LOCAL_CHECKOUTS_DIR}"
     
   - name: "Show build results"
     type: "shell"
-    command: "echo"
-    args:
-      - "Build completed successfully!" 
+    command: "echo 'Build completed successfully!'" 

@@ -8,59 +8,29 @@ variables:
 steps:
   - name: "Create namespace"
     type: "kubectl"
-    command: "create"
-    args:
-      - "namespace"
-      - "${NAMESPACE}"
+    command: "create namespace ${NAMESPACE}"
     ignore_errors: true
     
   - name: "Check if operator already deployed"
     type: "kubectl"
-    command: "get"
-    args:
-      - "deployment"
-      - "opendatahub-operator"
-      - "-n"
-      - "${NAMESPACE}"
+    command: "get deployment opendatahub-operator -n ${NAMESPACE}"
     ignore_errors: true
     
   - name: "Deploy operator"
     type: "kubectl"
-    command: "apply"
-    args:
-      - "-f"
-      - "deployments/operator.yaml"
-      - "-n"
-      - "${NAMESPACE}"
+    command: "apply -f deployments/operator.yaml -n ${NAMESPACE}"
     
   - name: "Wait for operator to be ready"
     type: "kubectl"
-    command: "wait"
-    args:
-      - "--for=condition=Available"
-      - "deployment/opendatahub-operator"
-      - "-n"
-      - "${NAMESPACE}"
-      - "--timeout=${WAIT_TIMEOUT}s"
+    command: "wait --for=condition=Available deployment/opendatahub-operator -n ${NAMESPACE} --timeout=${WAIT_TIMEOUT}s"
     
   - name: "Deploy DSCI"
     type: "kubectl"
-    command: "apply"
-    args:
-      - "-f"
-      - "deployments/dsci.yaml"
-      - "-n"
-      - "${NAMESPACE}"
+    command: "apply -f deployments/dsci.yaml -n ${NAMESPACE}"
     
   - name: "Wait for DSCI to be ready"
     type: "kubectl"
-    command: "wait"
-    args:
-      - "--for=condition=Ready"
-      - "datascienceclusterinitializations.opendatahub.io/default-dsci"
-      - "-n"
-      - "${NAMESPACE}"
-      - "--timeout=${WAIT_TIMEOUT}s"
+    command: "wait --for=condition=Ready datascienceclusterinitializations.opendatahub.io/default-dsci -n ${NAMESPACE} --timeout=${WAIT_TIMEOUT}s"
     
   - name: "Deploy DSC"
     type: "kubectl"

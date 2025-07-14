@@ -5,17 +5,16 @@ steps:
   - name: "Check build environment"
     type: "tool"
     command: "show-config"
-    args: []
     
   - name: "Build operator image"
-    type: "tool"
-    command: "build-operator"
-    args: 
-      - "--image"
-      - "--local"
-      - "--use-branch"
-      - "--custom-registry"
+    type: "shell"
+    command: "make image-build-custom-registry-local-branch"
+    working_directory: "${LOCAL_CHECKOUTS_DIR}/opendatahub-operator"
     env:
+      FORK_ORG: "${FORK_ORG}"
+      BRANCH_NAME: "${BRANCH_NAME}"
+      LOCAL_MODE: "true"
+      LOCAL_CHECKOUTS_DIR: "${LOCAL_CHECKOUTS_DIR}"
       CUSTOM_REGISTRY_URL: "${REGISTRY_URL}"
       CUSTOM_REGISTRY_NAMESPACE: "${REGISTRY_NAMESPACE}"
       CUSTOM_REGISTRY_TAG: "${REGISTRY_TAG}" 

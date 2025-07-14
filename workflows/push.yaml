@@ -3,10 +3,9 @@ description: "Push the built OpenDataHub operator image to registry"
 
 steps:
   - name: "Push operator image"
-    type: "tool"
-    command: "image-push"
-    args:
-      - "--custom-registry"
+    type: "shell"
+    command: "make image-push-custom-registry"
+    working_directory: "${LOCAL_CHECKOUTS_DIR}/opendatahub-operator"
     env:
       CUSTOM_REGISTRY_URL: "${REGISTRY_URL}"
       CUSTOM_REGISTRY_NAMESPACE: "${REGISTRY_NAMESPACE}"

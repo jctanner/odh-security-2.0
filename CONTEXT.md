@@ -214,12 +214,13 @@ This project has established a comprehensive development infrastructure for migr
     - Date: Current session
 
 24. **Config Defaults for All Build Commands** (Completed)
-    - Fixed inconsistency: build-and-push and image-push commands now apply config.yaml defaults
-    - All build commands (build-operator, build-and-push, image-push) consistently use config defaults
+    - Fixed inconsistency: build-and-push and image-push commands applied config.yaml defaults
+    - All build commands consistently used config defaults with command-line override capability
     - Config defaults applied only when flags not explicitly provided by user
     - Clear feedback showing which config defaults were applied
-    - Maintains command-line argument precedence over config defaults
+    - Maintained command-line argument precedence over config defaults
     - Date: Current session
+    - Note: These commands later replaced by workflow system in item #31
 
 25. **Code Refactoring: lib/ Directory Structure** (Completed)
     - Created lib/ directory for Python modules to improve code organization
@@ -295,6 +296,48 @@ This project has established a comprehensive development infrastructure for migr
     - All functionality preserved: listing, showing, variable preview, and execution with overrides
     - Improved UX: grouped related commands under single workflow namespace
     - Successfully tested: all operations work correctly with new command structure
+    - Date: Current session
+
+31. **Redundant Subcommand Cleanup** (Completed)
+    - Removed redundant build-related subcommands now replaced by workflows
+    - Removed: build-operator, build-and-push, image-push subcommands and their functions
+    - Replaced by: build.yaml, build-push.yaml, push.yaml workflows
+    - Maintained all repository management commands (whoami, setup-operator, forks-status, etc.)
+    - Updated help text and examples to guide users to workflow system for build operations
+    - Reduced tool.py from 1282 to 886 lines (31% reduction)
+    - Cleaner tool interface with single workflow system for build/deploy operations
+    - All build functionality preserved through equivalent workflows
+    - Date: Current session
+
+32. **Workflow Path Variable Fix** (Completed)
+    - Fixed ugly hardcoded LOCAL_CHECKOUTS_DIR: ".." in workflow files
+    - Enhanced WorkflowEngine to automatically compute project-relative paths as absolute paths
+    - Added PROJECT_ROOT, LOCAL_CHECKOUTS_DIR, and WORKFLOWS_DIR as computed variables
+    - LOCAL_CHECKOUTS_DIR now resolves to absolute path: /path/to/project/src
+    - Removed hardcoded relative paths from build.yaml and build-only.yaml
+    - Workflow files now use clean variable substitution: LOCAL_CHECKOUTS_DIR: "${LOCAL_CHECKOUTS_DIR}"
+    - Improved maintainability and eliminated fragile relative path dependencies
+    - Date: Current session
+
+33. **Working Directory Support in Workflows** (Completed)
+    - Added working_directory field to WorkflowStep dataclass for cleaner workflow definitions
+    - Enhanced WorkflowEngine to support working_directory parameter in all execution methods
+    - Updated _execute_kubectl, _execute_tool, _execute_shell, and _run_command to accept working_directory
+    - Replaced ugly bash -c "cd ... && command" patterns with clean working_directory specifications
+    - Updated build.yaml, build-only.yaml, and push.yaml to use working_directory: "${LOCAL_CHECKOUTS_DIR}/opendatahub-operator"
+    - Commands now execute directly (make image-build-custom-registry-local-branch) instead of bash -c wrappers
+    - Improved workflow readability and maintainability by eliminating directory change commands
+    - Fixed YAML parsing to properly handle working_directory field in WorkflowStep creation
+    - Date: Current session
+
+34. **Command Splitting for Cleaner Workflow Syntax** (Completed)
+    - Enhanced WorkflowEngine to support command splitting when args are not explicitly provided
+    - When args: field is omitted, commands are automatically split by spaces (first word = command, rest = args)
+    - Maintains backward compatibility: explicit args: field still works as before
+    - Updated workflow files to use cleaner syntax: command: "make image-build-custom-registry-local-branch"
+    - Eliminated verbose command/args patterns throughout build.yaml, build-only.yaml, push.yaml, and deploy.yaml
+    - Reduced workflow verbosity: "forks-status --dirty" instead of command/args pairs
+    - Improved readability while maintaining full functionality and variable substitution support
     - Date: Current session
 
 ## Established Requirements
@@ -390,13 +433,13 @@ This project has established a comprehensive development infrastructure for migr
 - **Git Configuration**: .gitignore prevents committing src/ contents and token file
 - **Authentication**: Secure token file configured, git credential prompting disabled
 - **Configuration**: YAML config file with fork organization, branch settings, and build defaults
-- **Automation**: Modular Python tool with lib/github_wrapper.py (924 lines) and tool.py CLI interface (1083 lines)
+- **Automation**: Modular Python tool with lib/github_wrapper.py (924 lines) and tool.py CLI interface (886 lines)
 - **Class Architecture**: WorkflowEngine (375 lines), BuildManager (350 lines), DeploymentManager (717 lines) for comprehensive workflow, build, and deployment management
 - **Workflow System**: Custom YAML workflow format with 6 modular workflows (build, push, deploy, build-push, build-only, build-push-deploy) supporting kubectl, tool, shell, nested workflow execution, and includes
 - **Repository Setup**: All 15 required repositories forked, cloned, and configured with feature branches
 - **Target Repositories**: 15 repositories successfully set up with SSH origins and repository-specific base branches
 - **Multi-Repository Management**: forks-status and forks-commit commands for efficient change management
-- **Build System**: Fully operational with environment variable architecture, consistent config-driven defaults across all build commands, local checkout workflow, feature branch support, and custom registry integration
+- **Build System**: Fully operational with environment variable architecture accessed through workflow system, local checkout workflow, feature branch support, and custom registry integration
 - **Build System Testing**: Complete end-to-end testing confirmed - manifest pre-population, multi-stage Docker build, custom registry tagging all working
 - **Build Architecture**: Environment variable-based configuration with clean separation between tool.py (configuration) and Makefile (build logic)
 - **Current Architecture**: Analysis required - networking implementation unknown
@@ -474,4 +517,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-11 17:00 UTC - Code Refactoring: lib/ Directory Structure Complete* 
+*Last Updated: 2025-01-11 18:50 UTC - Command Splitting for Cleaner Workflow Syntax Complete* 

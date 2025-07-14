@@ -14,6 +14,7 @@ class WorkflowStep:
     command: str
     args: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
+    working_directory: Optional[str] = None
     ignore_errors: bool = False
     condition: Optional[str] = None
 
@@ -101,6 +102,11 @@ class WorkflowEngine:
         if 'REGISTRY_TAG' in variables:
             variables['REGISTRY_TAG'] = variables['REGISTRY_TAG']
         
+        # Add computed project-relative paths (absolute paths)
+        variables['PROJECT_ROOT'] = self.project_root
+        variables['LOCAL_CHECKOUTS_DIR'] = os.path.join(self.project_root, 'src')
+        variables['WORKFLOWS_DIR'] = self.workflows_dir
+        
         return variables
     
     def load_workflow(self, workflow_name: str) -> WorkflowDefinition:
@@ -180,6 +186,7 @@ class WorkflowEngine:
                 command=step_data['command'],
                 args=step_data.get('args'),
                 env=step_data.get('env'),
+                working_directory=step_data.get('working_directory'),
                 ignore_errors=step_data.get('ignore_errors', False),
                 condition=step_data.get('condition')
             )
@@ -273,17 +280,34 @@ class WorkflowEngine:
         
         # Substitute variables in command and args
         command = self._substitute_variables(step.command, variables)
-        args = [self._substitute_variables(arg, variables) for arg in step.args] if step.args else []
+        
+        # If args not specified, split command by spaces to get command + args
+        if step.args is None:
+            # Split command into parts, first part is command, rest are args
+            command_parts = command.split()
+            if len(command_parts) > 1:
+                command = command_parts[0]
+                args = command_parts[1:]
+            else:
+                args = []
+        else:
+            # Use explicitly provided args
+            args = [self._substitute_variables(arg, variables) for arg in step.args]
+        
+        # Substitute variables in working_directory if specified
+        working_directory = None
+        if step.working_directory:
+            working_directory = self._substitute_variables(step.working_directory, variables)
         
         # Execute based on step type
         if step.type == 'kubectl':
-            return self._execute_kubectl(command, args, step.env)
+            return self._execute_kubectl(command, args, step.env, working_directory)
         elif step.type == 'tool':
-            return self._execute_tool(command, args, step.env)
+            return self._execute_tool(command, args, step.env, working_directory)
         elif step.type == 'workflow':
             return self._execute_nested_workflow(command, variables)
         elif step.type == 'shell':
-            return self._execute_shell(command, args, step.env)
+            return self._execute_shell(command, args, step.env, working_directory)
         else:
             print(f"  Unknown step type: {step.type}")
             return False
@@ -322,34 +346,36 @@ class WorkflowEngine:
         
         return re.sub(r'\$\{([^}]+)\}', replace_var, text)
     
-    def _execute_kubectl(self, command: str, args: List[str], env: Dict[str, str] = None) -> bool:
+    def _execute_kubectl(self, command: str, args: List[str], env: Dict[str, str] = None, working_directory: str = None) -> bool:
         """Execute a kubectl command
         
         Args:
             command: kubectl subcommand
             args: Additional arguments
             env: Environment variables
+            working_directory: Directory to run command in
             
         Returns:
             True if command succeeded, False otherwise
         """
         cmd = ['kubectl', command] + args
-        return self._run_command(cmd, env)
+        return self._run_command(cmd, env, working_directory)
     
-    def _execute_tool(self, command: str, args: List[str], env: Dict[str, str] = None) -> bool:
+    def _execute_tool(self, command: str, args: List[str], env: Dict[str, str] = None, working_directory: str = None) -> bool:
         """Execute a tool.py subcommand
         
         Args:
             command: tool.py subcommand
             args: Additional arguments
             env: Environment variables
+            working_directory: Directory to run command in
             
         Returns:
             True if command succeeded, False otherwise
         """
         tool_path = os.path.join(self.project_root, 'tool.py')
         cmd = ['python', tool_path, command] + args
-        return self._run_command(cmd, env)
+        return self._run_command(cmd, env, working_directory)
     
     def _execute_nested_workflow(self, workflow_name: str, variables: Dict[str, str]) -> bool:
         """Execute a nested workflow
@@ -364,31 +390,36 @@ class WorkflowEngine:
         print(f"  Executing nested workflow: {workflow_name}")
         return self.execute_workflow(workflow_name, variables)
     
-    def _execute_shell(self, command: str, args: List[str], env: Dict[str, str] = None) -> bool:
+    def _execute_shell(self, command: str, args: List[str], env: Dict[str, str] = None, working_directory: str = None) -> bool:
         """Execute a shell command
         
         Args:
             command: Shell command
             args: Additional arguments
             env: Environment variables
+            working_directory: Directory to run command in
             
         Returns:
             True if command succeeded, False otherwise
         """
         cmd = [command] + args
-        return self._run_command(cmd, env)
+        return self._run_command(cmd, env, working_directory)
     
-    def _run_command(self, cmd: List[str], env: Dict[str, str] = None) -> bool:
+    def _run_command(self, cmd: List[str], env: Dict[str, str] = None, working_directory: str = None) -> bool:
         """Run a command with real-time output
         
         Args:
             cmd: Command and arguments as list
             env: Environment variables to set
+            working_directory: Directory to run command in (defaults to project_root)
             
         Returns:
             True if command succeeded, False otherwise
         """
+        cwd = working_directory if working_directory else self.project_root
         print(f"  Running: {' '.join(cmd)}")
+        if working_directory:
+            print(f"  In directory: {cwd}")
         
         # Set up environment
         run_env = os.environ.copy()
@@ -402,7 +433,7 @@ class WorkflowEngine:
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
                 env=run_env,
-                cwd=self.project_root
+                cwd=cwd
             )
             
             # Print output in real-time
