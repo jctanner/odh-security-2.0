@@ -2,7 +2,7 @@
 # Ansible task file for building the OpenDataHub operator image from local checkouts
 
 - name: "Check build environment"
-  command: "python tool.py show-config"
+  live_shell: "python tool.py show-config"
   args:
     chdir: "{{ project_root }}"
   register: build_env_check
@@ -12,7 +12,7 @@
     var: build_env_check.stdout_lines
 
 - name: "Build operator image"
-  shell: "make image-build-custom-registry-local-branch"
+  live_shell: "make image-build-custom-registry-local-branch"
   args:
     chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
   environment:

@@ -231,7 +231,19 @@ class AnsibleEngine:
             env = os.environ.copy()
             env['ANSIBLE_HOST_KEY_CHECKING'] = 'False'
             
-            # Change to tasks directory so task files can be found
+            # Set action plugins path so Ansible can find our custom live_shell plugin
+            action_plugins_path = os.path.join(self.project_root, 'action_plugins')
+            env['ANSIBLE_ACTION_PLUGINS'] = action_plugins_path
+            
+            # Set library path so Ansible can find our custom live_shell module
+            library_path = os.path.join(self.project_root, 'library')
+            env['ANSIBLE_LIBRARY'] = library_path
+            
+            # Set config file path to ensure correct ansible.cfg is used
+            ansible_cfg_path = os.path.join(self.project_root, 'ansible.cfg')
+            env['ANSIBLE_CONFIG'] = ansible_cfg_path
+            
+            # Change to project root directory so action plugins can be found
             cmd.extend(['-i', 'localhost,', playbook_path])
             
             print(f"Running: {' '.join(cmd)}")
@@ -239,7 +251,7 @@ class AnsibleEngine:
             # Execute ansible-playbook
             result = subprocess.run(
                 cmd,
-                cwd=self.tasks_dir,
+                cwd=self.project_root,  # Run from project root to find action plugins
                 env=env,
                 capture_output=False,  # Always stream output live for debugging
                 text=True

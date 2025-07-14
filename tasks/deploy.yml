@@ -2,14 +2,14 @@
 # Ansible task file for deploying the full OpenDataHub stack to Kubernetes cluster
 
 - name: "Create namespace"
-  shell: "kubectl create namespace {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl create namespace {{ namespace | default('opendatahub') }}"
   register: create_namespace_result
   failed_when: 
     - create_namespace_result.rc != 0
     - "'AlreadyExists' not in create_namespace_result.stderr"
 
 - name: "Check if operator already deployed"
-  shell: "kubectl get deployment opendatahub-operator -n {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl get deployment opendatahub-operator -n {{ namespace | default('opendatahub') }}"
   register: check_operator_result
   failed_when: false
 
@@ -18,35 +18,35 @@
     msg: "Operator deployment status: {{ 'EXISTS' if check_operator_result.rc == 0 else 'NOT FOUND' }}"
 
 - name: "Deploy operator"
-  shell: "kubectl apply -f deployments/operator.yaml -n {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl apply -f deployments/operator.yaml -n {{ namespace | default('opendatahub') }}"
   register: deploy_operator_result
 
 - name: "Wait for operator to be ready"
-  shell: "kubectl wait --for=condition=Available deployment/opendatahub-operator -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
+  live_shell: "kubectl wait --for=condition=Available deployment/opendatahub-operator -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
   register: wait_operator_result
 
 - name: "Deploy DSCI"
-  shell: "kubectl apply -f deployments/dsci.yaml -n {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl apply -f deployments/dsci.yaml -n {{ namespace | default('opendatahub') }}"
   register: deploy_dsci_result
 
 - name: "Wait for DSCI to be ready"
-  shell: "kubectl wait --for=condition=Ready datascienceclusterinitializations.opendatahub.io/default-dsci -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
+  live_shell: "kubectl wait --for=condition=Ready datascienceclusterinitializations.opendatahub.io/default-dsci -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
   register: wait_dsci_result
 
 - name: "Deploy DSC"
-  shell: "kubectl apply -f deployments/dsc.yaml -n {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl apply -f deployments/dsc.yaml -n {{ namespace | default('opendatahub') }}"
   register: deploy_dsc_result
 
 - name: "Wait for DSC to be ready"
-  shell: "kubectl wait --for=condition=Ready datascienceclusters.opendatahub.io/default-dsc -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
+  live_shell: "kubectl wait --for=condition=Ready datascienceclusters.opendatahub.io/default-dsc -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
   register: wait_dsc_result
 
 - name: "Check operator status"
-  shell: "kubectl get deployment opendatahub-operator -n {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl get deployment opendatahub-operator -n {{ namespace | default('opendatahub') }}"
   register: final_operator_status
 
 - name: "Check DSC status"
-  shell: "kubectl get datascienceclusters.opendatahub.io -n {{ namespace | default('opendatahub') }}"
+  live_shell: "kubectl get datascienceclusters.opendatahub.io -n {{ namespace | default('opendatahub') }}"
   register: final_dsc_status
 
 - name: "Display deployment summary"

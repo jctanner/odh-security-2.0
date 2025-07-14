@@ -1,0 +1,12 @@
+---
+- name: Simple test
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Test debug module"
+      debug:
+        msg: "Hello from debug module!"
+    
+    - name: "Test shell module"
+      shell: "echo 'Hello from shell module!'" 

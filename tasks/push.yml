@@ -2,7 +2,7 @@
 # Ansible task file for pushing the built OpenDataHub operator image to registry
 
 - name: "Push operator image"
-  shell: "make image-push-custom-registry"
+  live_shell: "make image-push-custom-registry"
   args:
     chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
   environment:
