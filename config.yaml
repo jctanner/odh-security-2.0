@@ -66,6 +66,75 @@ migration:
   # Pull request title template
   pr_title_template: "Gateway API Migration: {repository}"
 
+# Deployment Configuration
+# Settings for OpenDataHub deployment including DSCI and DSC resources
+deployment:
+  # Default namespace for OpenDataHub components
+  namespace: "opendatahub"
+  
+  # Timeout for waiting on resources to be ready (in seconds)
+  wait_timeout: 300
+  
+  # DSC Initialization configuration
+  dsci:
+    name: "default-dsci"
+    spec:
+      # monitoring:
+      #   managementState: "Managed"  # Uncomment to enable monitoring
+      #   namespace: "opendatahub"
+      applicationsNamespace: "opendatahub"
+      # serviceMesh:
+      #   managementState: "Managed"  # Uncomment and configure if Istio is available
+      #   controlPlane:
+      #     metricsCollection: "Istio"
+      #     name: "data-science-smcp"
+      #     namespace: "istio-system"
+      trustedCABundle:
+        managementState: "Managed"
+        customCABundle: ""
+  
+  # Data Science Cluster configuration
+  dsc:
+    name: "default-dsc"
+    spec:
+      components:
+        # codeflare:
+        #   managementState: "Managed"
+        dashboard:
+          managementState: "Managed"
+        # datasciencepipelines:
+        #   managementState: "Managed"
+        # kserve:
+        #   managementState: "Managed"
+        #   nim:
+        #     managementState: "Managed"
+        #   rawDeploymentServiceConfig: "Headed"
+        #   serving:
+        #     ingressGateway:
+        #       certificate:
+        #         type: "OpenshiftDefaultIngress"
+        #     name: "knative-serving"
+        #     managementState: "Managed"
+        # modelmeshserving:
+        #   managementState: "Managed"
+        # kueue:
+        #   managementState: "Managed"
+        # trainingoperator:
+        #   managementState: "Managed"
+        # ray:
+        #   managementState: "Managed"
+        workbenches:
+          managementState: "Managed"
+        # trustyai:
+        #   managementState: "Managed"
+        # modelregistry:
+        #   managementState: "Managed"
+        #   registriesNamespace: "odh-model-registries"
+        # feastoperator:
+        #   managementState: "Managed"
+        # llamastackoperator:
+        #   managementState: "Removed"
+
 # Project metadata
 project:
   name: "OpenDataHub Gateway API Migration"

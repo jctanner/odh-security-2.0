@@ -94,6 +94,8 @@ class AnsibleEngine:
         variables.update({
             'namespace': deployment_config.get('namespace', 'opendatahub'),
             'wait_timeout': deployment_config.get('wait_timeout', 300),
+            'dsci_config': deployment_config.get('dsci', {}),
+            'dsc_config': deployment_config.get('dsc', {}),
         })
         
         # Add runtime variable overrides

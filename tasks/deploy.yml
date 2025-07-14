@@ -40,26 +40,60 @@
     cmd: "kubectl wait --for=condition=Available deployment/opendatahub-operator-controller-manager -n opendatahub-operator-system --timeout={{ wait_timeout }}s"
   register: wait_operator_result
 
+- name: "Create DSCI configuration file"
+  copy:
+    content: |
+      apiVersion: dscinitialization.opendatahub.io/v1
+      kind: DSCInitialization
+      metadata:
+        labels:
+          app.kubernetes.io/name: dscinitialization
+          app.kubernetes.io/instance: default
+          app.kubernetes.io/part-of: opendatahub-operator
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/created-by: opendatahub-operator
+        name: {{ dsci_config.name }}
+      spec:
+      {{ dsci_config.spec | to_nice_yaml | indent(2, first=True) }}
+    dest: "/tmp/dsci-config.yaml"
+  register: create_dsci_config
+
 - name: "Deploy DSCI"
   live_shell:
-    cmd: "kubectl apply -f config/samples/dscinitialization_v1_dscinitialization.yaml -n {{ namespace }}"
-    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+    cmd: "kubectl apply -f /tmp/dsci-config.yaml -n {{ namespace }}"
   register: deploy_dsci_result
 
 - name: "Wait for DSCI to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Ready dscinitializations.dscinitialization.opendatahub.io/default-dsci -n {{ namespace }} --timeout={{ wait_timeout }}s"
+    cmd: "kubectl wait --for=condition=Available dscinitializations.dscinitialization.opendatahub.io/{{ dsci_config.name }} -n {{ namespace }} --timeout={{ wait_timeout }}s"
   register: wait_dsci_result
+
+- name: "Create DSC configuration file"
+  copy:
+    content: |
+      apiVersion: datasciencecluster.opendatahub.io/v1
+      kind: DataScienceCluster
+      metadata:
+        name: {{ dsc_config.name }}
+        labels:
+          app.kubernetes.io/name: datasciencecluster
+          app.kubernetes.io/instance: default
+          app.kubernetes.io/part-of: opendatahub-operator
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/created-by: opendatahub-operator
+      spec:
+      {{ dsc_config.spec | to_nice_yaml | indent(2, first=True) }}
+    dest: "/tmp/dsc-config.yaml"
+  register: create_dsc_config
 
 - name: "Deploy DSC"
   live_shell:
-    cmd: "kubectl apply -f config/samples/datasciencecluster_v1_datasciencecluster.yaml -n {{ namespace }}"
-    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+    cmd: "kubectl apply -f /tmp/dsc-config.yaml -n {{ namespace }}"
   register: deploy_dsc_result
 
 - name: "Wait for DSC to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Ready datascienceclusters.datasciencecluster.opendatahub.io/default-dsc -n {{ namespace }} --timeout={{ wait_timeout }}s"
+    cmd: "kubectl wait --for=condition=Ready datascienceclusters.datasciencecluster.opendatahub.io/{{ dsc_config.name }} -n {{ namespace }} --timeout={{ wait_timeout }}s"
   register: wait_dsc_result
 
 - name: "Check operator status"
@@ -72,11 +106,24 @@
     cmd: "kubectl get datascienceclusters.datasciencecluster.opendatahub.io -n {{ namespace }}"
   register: final_dsc_status
 
+- name: "Clean up temporary files"
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/dsci-config.yaml"
+    - "/tmp/dsc-config.yaml"
+  register: cleanup_result
+
 - name: "Display deployment summary"
   debug:
     msg:
       - "Deployment completed successfully!"
       - "Operator Namespace: opendatahub-operator-system"
       - "Target Namespace: {{ namespace }}"
-      - "Operator Status: {{ final_operator_status.stdout_lines }}"
-      - "DSC Status: {{ final_dsc_status.stdout_lines }}" 
+      - "DSCI Name: {{ dsci_config.name }}"
+      - "DSC Name: {{ dsc_config.name }}"
+      - "Service Mesh: {{ dsci_config.spec.serviceMesh.managementState | default('Not configured') }}"
+      - "Monitoring: {{ dsci_config.spec.monitoring.managementState | default('Not configured') }}"
+      - "Operator Status: {{ final_operator_status.stdout | default('Status check failed') }}"
+      - "DSC Status: {{ final_dsc_status.stdout | default('Status check failed') }}" 
