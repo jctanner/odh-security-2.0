@@ -1,0 +1,151 @@
+# Cleanup OpenDataHub Tasks
+# Ansible task file for completely removing OpenDataHub deployment from Kubernetes cluster
+
+- name: "Remove DSC resources"
+  live_shell:
+    cmd: "kubectl delete datascienceclusters.datasciencecluster.opendatahub.io --all -n {{ namespace }}"
+  register: remove_dsc_result
+  failed_when: false
+
+- name: "Wait for DSC cleanup to complete"
+  live_shell:
+    cmd: "kubectl get datascienceclusters.datasciencecluster.opendatahub.io -n {{ namespace }} --no-headers 2>/dev/null | wc -l"
+  register: check_dsc_cleanup
+  until: check_dsc_cleanup.stdout | int == 0
+  retries: 30
+  delay: 10
+  failed_when: false
+
+- name: "Remove DSCI resources"
+  live_shell:
+    cmd: "kubectl delete dscinitializations.dscinitialization.opendatahub.io --all -n {{ namespace }}"
+  register: remove_dsci_result
+  failed_when: false
+
+- name: "Wait for DSCI cleanup to complete"
+  live_shell:
+    cmd: "kubectl get dscinitializations.dscinitialization.opendatahub.io -n {{ namespace }} --no-headers 2>/dev/null | wc -l"
+  register: check_dsci_cleanup
+  until: check_dsci_cleanup.stdout | int == 0
+  retries: 30
+  delay: 10
+  failed_when: false
+
+- name: "Remove operator deployment"
+  live_shell:
+    cmd: "kubectl delete deployment opendatahub-operator-controller-manager -n opendatahub-operator-system"
+  register: remove_operator_result
+  failed_when: false
+
+- name: "Remove operator namespace resources"
+  live_shell:
+    cmd: "kubectl delete all --all -n opendatahub-operator-system"
+  register: remove_operator_namespace_resources
+  failed_when: false
+
+- name: "Remove target namespace resources"
+  live_shell:
+    cmd: "kubectl delete all --all -n {{ namespace }}"
+  register: remove_target_namespace_resources
+  failed_when: false
+
+- name: "Remove operator namespace"
+  live_shell:
+    cmd: "kubectl delete namespace opendatahub-operator-system"
+  register: remove_operator_namespace_result
+  failed_when: false
+
+- name: "Remove target namespace"
+  live_shell:
+    cmd: "kubectl delete namespace {{ namespace }}"
+  register: remove_target_namespace_result
+  failed_when: false
+
+- name: "Remove OpenDataHub CRDs"
+  live_shell:
+    cmd: "kubectl delete crd -l app.kubernetes.io/part-of=opendatahub-operator"
+  register: remove_crds_result
+  failed_when: false
+
+- name: "Remove specific OpenDataHub CRDs"
+  live_shell:
+    cmd: "kubectl delete crd {{ item }}"
+  loop:
+    - "auths.services.platform.opendatahub.io"
+    - "codeflares.components.platform.opendatahub.io"
+    - "dashboards.components.platform.opendatahub.io"
+    - "datascienceclusters.datasciencecluster.opendatahub.io"
+    - "datasciencepipelines.components.platform.opendatahub.io"
+    - "dscinitializations.dscinitialization.opendatahub.io"
+    - "feastoperators.components.platform.opendatahub.io"
+    - "featuretrackers.features.opendatahub.io"
+    - "kserves.components.platform.opendatahub.io"
+    - "kueues.components.platform.opendatahub.io"
+    - "llamastackoperators.components.platform.opendatahub.io"
+    - "modelcontrollers.components.platform.opendatahub.io"
+    - "modelmeshservings.components.platform.opendatahub.io"
+    - "modelregistries.components.platform.opendatahub.io"
+    - "monitorings.services.platform.opendatahub.io"
+    - "rays.components.platform.opendatahub.io"
+    - "trainingoperators.components.platform.opendatahub.io"
+    - "trustyais.components.platform.opendatahub.io"
+    - "workbenches.components.platform.opendatahub.io"
+  register: remove_specific_crds_result
+  failed_when: false
+
+- name: "Remove cluster roles"
+  live_shell:
+    cmd: "kubectl delete clusterrole {{ item }}"
+  loop:
+    - "opendatahub-operator-controller-manager-role"
+    - "opendatahub-operator-metrics-reader"
+  register: remove_cluster_roles_result
+  failed_when: false
+
+- name: "Remove cluster role bindings"
+  live_shell:
+    cmd: "kubectl delete clusterrolebinding {{ item }}"
+  loop:
+    - "opendatahub-operator-controller-manager-rolebinding"
+  register: remove_cluster_role_bindings_result
+  failed_when: false
+
+- name: "Remove webhook configurations"
+  live_shell:
+    cmd: "kubectl delete {{ item.type }} {{ item.name }}"
+  loop:
+    - { type: "mutatingwebhookconfiguration", name: "opendatahub-operator-mutating-webhook-configuration" }
+    - { type: "validatingwebhookconfiguration", name: "opendatahub-operator-validating-webhook-configuration" }
+  register: remove_webhooks_result
+  failed_when: false
+
+- name: "Remove any remaining OpenDataHub resources"
+  live_shell:
+    cmd: "kubectl get all --all-namespaces -l app.kubernetes.io/part-of=opendatahub-operator --no-headers 2>/dev/null | awk '{print $1, $2, $3}' | xargs -r kubectl delete"
+  register: remove_remaining_resources
+  failed_when: false
+
+- name: "Clean up temporary files"
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/dsci-config.yaml"
+    - "/tmp/dsc-config.yaml"
+  register: cleanup_temp_files
+  failed_when: false
+
+- name: "Display cleanup summary"
+  debug:
+    msg:
+      - "OpenDataHub cleanup completed!"
+      - "Target Namespace: {{ namespace }}"
+      - "Operator Namespace: opendatahub-operator-system"
+      - "DSC Removal: {{ 'SUCCESS' if remove_dsc_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "DSCI Removal: {{ 'SUCCESS' if remove_dsci_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "Operator Removal: {{ 'SUCCESS' if remove_operator_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "Namespace Removal: {{ 'SUCCESS' if remove_target_namespace_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "CRDs Removal: {{ 'SUCCESS' if remove_crds_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "Cluster Resources: {{ 'SUCCESS' if remove_cluster_roles_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "Webhooks: {{ 'SUCCESS' if remove_webhooks_result.rc | default(1) == 0 else 'FAILED/NOT FOUND' }}"
+      - "Note: 'FAILED/NOT FOUND' is expected if resources were already removed" 
