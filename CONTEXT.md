@@ -430,6 +430,27 @@ This project has established a comprehensive development infrastructure for migr
     - DSCI now processes successfully with gateway-api networking mode enabled
     - Date: Current session
 
+42. **Gateway Controller RBAC Permissions Resolution** (Completed)
+    - Identified persistent RBAC permissions issue preventing Gateway controller operation
+    - Created PROBLEM_1.md to document investigation process and symptoms
+    - Root cause: Missing RBAC permissions in config/rbac/role.yaml for Gateway API and cert-manager resources
+    - Added missing permissions: gateway.networking.k8s.io (gateways, httproutes, referencegrants)
+    - Added missing permissions: services.platform.opendatahub.io (gateways) 
+    - Added missing permissions: cert-manager.io (certificates, certificaterequests, issuers, clusterissuers)
+    - Applied RBAC changes via kustomize build config/default | kubectl apply -f -
+    - Verified permissions working via kubectl auth can-i commands
+    - Controller logs show no more RBAC forbidden errors, Gateway controller operational
+    - Date: Current session
+
+43. **HTTPRoute Domain Resolution Issue Discovery** (Completed)
+    - Discovered new issue after RBAC fix: HTTPRoute hostname validation errors
+    - Created PROBLEM_2.md to document HTTPRoute domain variable substitution issue
+    - Issue: HTTPRoute created with literal $(dashboard-domain) instead of resolved domain value
+    - Error: HTTPRoute hostname validation fails due to invalid DNS format
+    - Impact: Dashboard Gateway API routing blocked despite controller functioning
+    - Next phase: Fix domain variable substitution for Gateway API resources
+    - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -596,17 +617,34 @@ This project has established a comprehensive development infrastructure for migr
    - Multiple deployment issues: leader election conflicts, missing RBAC permissions, missing CRDs
    - ✅ Resolved by adding OpenDataHubGateway adminGroups entry, fixing operator deployment, and adding required permissions
 
+5. **Gateway Controller RBAC Permissions** (✅ Resolved)
+   - Gateway controller unable to watch Gateway API and cert-manager resources
+   - Root cause: Missing RBAC permissions in config/rbac/role.yaml for Gateway API and cert-manager resources
+   - Controller logs showed continuous "forbidden" errors for gateways.gateway.networking.k8s.io and certificates.cert-manager.io
+   - Clean rebuild/redeploy cycles didn't resolve the issue - problem was in source configuration
+   - ✅ Resolved by adding missing permissions to role.yaml and applying via kustomize
+
+6. **HTTPRoute Domain Resolution** (🔄 Active)
+   - HTTPRoute resource creation fails with hostname validation error
+   - Issue: HTTPRoute created with literal $(dashboard-domain) instead of resolved domain value
+   - Error: "spec.hostnames[0]: Invalid value: 'odh-dashboard.$(dashboard-domain)'" 
+   - Root cause: Domain variable substitution not working for Gateway API resources
+   - Impact: Dashboard Gateway API routing blocked despite controller functioning
+   - Status: PROBLEM_2.md created for investigation and resolution
+
 ## Next Steps
 *Immediate planned actions*
 
-1. **Gateway API Controller RBAC Fix** (In Progress)
+1. **Gateway API HTTPRoute Domain Resolution** (In Progress)
    - ✅ Deploy Gateway controller with DSCI networking.mode: "gateway-api"
    - ✅ Identified and resolved DSCI null phase issue
    - ✅ Fixed Auth resource creation for OpenDataHubGateway platform
    - ✅ Resolved operator permissions and deployment issues
-   - ✅ **PROBLEM_1.md Created**: Documented persistent RBAC permissions issue
-   - ✅ **Root Cause Identified**: Missing RBAC permissions in config/rbac/role.yaml for Gateway API and cert-manager resources
-   - 🔄 **Next**: Add required RBAC rules to role.yaml and rebuild/redeploy
+   - ✅ **PROBLEM_1.md - RESOLVED**: Gateway controller RBAC permissions issue fixed
+   - ✅ **RBAC Fix Applied**: Added missing Gateway API and cert-manager permissions to role.yaml
+   - ✅ **Controller Functioning**: No more RBAC forbidden errors, Gateway controller operational
+   - ✅ **PROBLEM_2.md Created**: HTTPRoute hostname validation issue with unresolved `$(dashboard-domain)` variable
+   - 🔄 **Next**: Fix domain variable substitution for HTTPRoute resources
    - 🔄 Test namespace labeling and HTTPRoute security restrictions
    - 🔄 Validate platform-aware domain resolution functionality
    - 🔄 Test TLS certificate integration and Gateway listeners
