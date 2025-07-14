@@ -5,16 +5,21 @@ This package contains modular components for the OpenDataHub Gateway API migrati
 """
 
 from .github_wrapper import GitHubWrapper, RepoInfo
-from .workflow_engine import WorkflowEngine, WorkflowDefinition, WorkflowStep
+from .ansible_engine import AnsibleEngine
 from .build_manager import BuildManager, BuildConfig, BuildResult
 from .deployment_manager import DeploymentManager, DeploymentConfig, DeploymentResult, DeploymentStatus
+
+# Keep legacy WorkflowEngine for compatibility during transition
+try:
+    from .workflow_engine import WorkflowEngine, WorkflowDefinition, WorkflowStep
+    _legacy_available = True
+except ImportError:
+    _legacy_available = False
 
 __all__ = [
     'GitHubWrapper',
     'RepoInfo',
-    'WorkflowEngine',
-    'WorkflowDefinition',
-    'WorkflowStep',
+    'AnsibleEngine',
     'BuildManager',
     'BuildConfig',
     'BuildResult',
@@ -22,4 +27,8 @@ __all__ = [
     'DeploymentConfig',
     'DeploymentResult',
     'DeploymentStatus'
-] 
+]
+
+# Add legacy exports if available
+if _legacy_available:
+    __all__.extend(['WorkflowEngine', 'WorkflowDefinition', 'WorkflowStep']) 

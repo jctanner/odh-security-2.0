@@ -47,4 +47,9 @@ MANIFEST
 # Virtual environments
 venv/
 env/
-ENV/ 
+ENV/
+
+# Ansible artifacts
+*.retry
+.ansible/
+ansible.log 

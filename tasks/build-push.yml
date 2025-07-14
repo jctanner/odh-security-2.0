@@ -1,0 +1,8 @@
+# Build and Push OpenDataHub Operator Tasks
+# Ansible task file for building and pushing the OpenDataHub operator image
+
+- name: "Build OpenDataHub Operator"
+  include_tasks: build.yml
+
+- name: "Push OpenDataHub Operator Image"
+  include_tasks: push.yml 

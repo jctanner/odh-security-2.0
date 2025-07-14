@@ -58,7 +58,7 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 # Import from lib directory
 from github_wrapper import GitHubWrapper, RepoInfo
-from workflow_engine import WorkflowEngine
+from ansible_engine import AnsibleEngine
 
 
 def cmd_whoami(args):
@@ -706,26 +706,39 @@ def cmd_forks_commit(args):
 def cmd_workflow(args):
     """Handle workflow subcommand with multiple operations"""
     try:
-        engine = WorkflowEngine()
+        engine = AnsibleEngine()
         
         # Handle --list operation
         if args.list:
-            workflow_names = engine.list_workflows()
-            if not workflow_names:
-                print("No workflows found in workflows/ directory")
+            task_names = engine.list_tasks()
+            if not task_names:
+                print("No task files found in tasks/ directory")
                 return 0
             
-            print("Available workflows:")
-            for workflow_name in workflow_names:
-                try:
-                    workflow = engine.load_workflow(workflow_name)
-                    print(f"  • {workflow.name} - {workflow.description}")
-                    if workflow.includes:
-                        print(f"    Includes: {', '.join(workflow.includes)}")
-                    print(f"    Steps: {len(workflow.steps)}")
-                    print()
-                except Exception as e:
-                    print(f"  • {workflow_name} - Error loading workflow: {e}")
+            print("Available tasks:")
+            for task_name in task_names:
+                task_path = engine.get_task_file_path(task_name)
+                if task_path:
+                    try:
+                        # Read first few lines to get description/comment
+                        with open(task_path, 'r') as f:
+                            lines = f.readlines()
+                            description = "Ansible task file"
+                            # Look for description in comments
+                            for line in lines[:5]:
+                                line = line.strip()
+                                if line.startswith('#') and any(word in line.lower() for word in ['ansible', 'task', 'file']):
+                                    description = line[1:].strip()
+                                    break
+                        
+                        print(f"  • {task_name} - {description}")
+                        print(f"    File: {task_path}")
+                        print()
+                    except Exception as e:
+                        print(f"  • {task_name} - Error reading task file: {e}")
+                        print()
+                else:
+                    print(f"  • {task_name} - Task file not found")
                     print()
             return 0
         
@@ -735,60 +748,24 @@ def cmd_workflow(args):
                 # Show all config variables
                 engine.show_available_variables()
             else:
-                # Show specific workflow variables
-                try:
-                    variables = engine.preview_workflow_variables(args.vars)
-                    print(f"Variables for workflow '{args.vars}':")
-                    for key, value in variables.items():
-                        print(f"  {key}: {value}")
-                except Exception as e:
-                    print(f"❌ Error loading workflow '{args.vars}': {e}")
-                    return 1
+                # Show variables for specific task (same as global since they come from config)
+                print(f"Variables available for task '{args.vars}':")
+                engine.show_available_variables()
             return 0
         
         # Handle --show operation
         if args.show:
             try:
-                workflow = engine.load_workflow(args.show)
-                print(f"Workflow: {workflow.name}")
-                print(f"Description: {workflow.description}")
-                
-                if workflow.includes:
-                    print(f"Includes: {', '.join(workflow.includes)}")
-                
-                if workflow.variables:
-                    print("\nWorkflow Variables:")
-                    for key, value in workflow.variables.items():
-                        print(f"  {key}: {value}")
-                
-                print(f"\nSteps ({len(workflow.steps)}):")
-                for i, step in enumerate(workflow.steps, 1):
-                    print(f"  {i}. {step.name}")
-                    print(f"     Type: {step.type}")
-                    if step.type == 'kubectl':
-                        print(f"     Command: kubectl {step.command} {' '.join(step.args)}")
-                    elif step.type == 'tool':
-                        print(f"     Command: ./tool.py {step.command} {' '.join(step.args)}")
-                    elif step.type == 'shell':
-                        print(f"     Command: {step.command} {' '.join(step.args)}")
-                    elif step.type == 'workflow':
-                        print(f"     Workflow: {step.workflow_name}")
-                    
-                    if step.env:
-                        print(f"     Environment: {step.env}")
-                    if step.ignore_errors:
-                        print(f"     Ignore errors: True")
-                    print()
-                
+                engine.show_task_info(args.show)
                 return 0
             except Exception as e:
-                print(f"❌ Error loading workflow '{args.show}': {e}")
+                print(f"❌ Error showing task '{args.show}': {e}")
                 return 1
         
         # Handle --name operation (requires --exec)
         if args.name:
             if not args.exec:
-                print("❌ --name requires --exec flag to execute the workflow")
+                print("❌ --name requires --exec flag to execute the task")
                 return 1
             
             # Parse runtime variables
@@ -801,24 +778,25 @@ def cmd_workflow(args):
                     key, value = var_assignment.split('=', 1)
                     runtime_vars[key] = value
             
-            # Execute workflow
+            # Execute task
             try:
-                print(f"🔄 Executing workflow: {args.name}")
+                print(f"🔄 Executing task: {args.name}")
                 if runtime_vars:
                     print(f"📋 Runtime variables: {runtime_vars}")
                 print()
                 
-                success = engine.execute_workflow(args.name, runtime_vars)
+                verbose = getattr(args, 'verbose', False)
+                success = engine.execute_task(args.name, runtime_vars, verbose)
                 
                 if success:
-                    print(f"\n✅ Workflow '{args.name}' completed successfully")
+                    print(f"\n✅ Task '{args.name}' completed successfully")
                     return 0
                 else:
-                    print(f"\n❌ Workflow '{args.name}' failed")
+                    print(f"\n❌ Task '{args.name}' failed")
                     return 1
                     
             except Exception as e:
-                print(f"❌ Error executing workflow '{args.name}': {e}")
+                print(f"❌ Error executing task '{args.name}': {e}")
                 return 1
         
         # If we get here, no valid operation was specified
@@ -826,7 +804,7 @@ def cmd_workflow(args):
         return 1
         
     except Exception as e:
-        print(f"❌ Error in workflow operation: {e}")
+        print(f"❌ Error in task operation: {e}")
         return 1
 
 
@@ -852,8 +830,8 @@ Examples:
   %(prog)s workflow --list
   %(prog)s workflow --show build-push-deploy
   %(prog)s workflow --name build --exec
-  %(prog)s workflow --name build-push-deploy --exec --var REGISTRY_TAG=dev
-  %(prog)s workflow --name deploy --exec --var NAMESPACE=test
+  %(prog)s workflow --name build-push-deploy --exec --var registry_tag=dev
+  %(prog)s workflow --name deploy --exec --var namespace=test
   %(prog)s workflow --vars
   %(prog)s workflow --vars build-push-deploy
   %(prog)s list-repos opendatahub-io
@@ -864,7 +842,7 @@ Examples:
 Note: This tool can be run from anywhere within the project directory tree.
       It will automatically find config.yaml and .github_token files in the project root.
         
-For build and deployment operations, use the workflow system:
+For build and deployment operations, use the Ansible-based task system:
   %(prog)s workflow --name build --exec                    # Build operator
   %(prog)s workflow --name build-push --exec               # Build and push
   %(prog)s workflow --name push --exec                     # Push image
@@ -1013,10 +991,10 @@ For build and deployment operations, use the workflow system:
     )
     forks_commit_parser.set_defaults(func=cmd_forks_commit)
     
-    # Workflow subcommand with multiple operations
+    # Workflow subcommand with multiple operations (now using Ansible tasks)
     workflow_parser = subparsers.add_parser(
         'workflow',
-        help='Workflow management operations'
+        help='Ansible-based task management operations'
     )
     
     # Create mutually exclusive group for main operations
@@ -1025,13 +1003,13 @@ For build and deployment operations, use the workflow system:
     workflow_group.add_argument(
         '--list',
         action='store_true',
-        help='List all available workflows'
+        help='List all available Ansible task files'
     )
     
     workflow_group.add_argument(
         '--show',
         metavar='NAME',
-        help='Show details of a specific workflow'
+        help='Show details of a specific task file'
     )
     
     workflow_group.add_argument(
@@ -1039,27 +1017,27 @@ For build and deployment operations, use the workflow system:
         nargs='?',
         const='',
         metavar='NAME',
-        help='Show workflow variables (all config vars if no name specified)'
+        help='Show available Ansible variables (all config vars if no name specified)'
     )
     
     workflow_group.add_argument(
         '--name',
         metavar='NAME',
-        help='Specify workflow name for execution (requires --exec)'
+        help='Specify task name for execution (requires --exec)'
     )
     
-    # Additional flags for workflow execution
+    # Additional flags for task execution
     workflow_parser.add_argument(
         '--exec',
         action='store_true',
-        help='Execute the workflow specified by --name'
+        help='Execute the task specified by --name'
     )
     
     workflow_parser.add_argument(
         '--var',
         action='append',
         metavar='KEY=VALUE',
-        help='Set workflow variables (format: KEY=VALUE). Can be used multiple times.'
+        help='Set Ansible variables (format: KEY=VALUE). Can be used multiple times.'
     )
     
     workflow_parser.set_defaults(func=cmd_workflow)

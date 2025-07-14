@@ -1,0 +1,17 @@
+# Push OpenDataHub Operator Image Tasks
+# Ansible task file for pushing the built OpenDataHub operator image to registry
+
+- name: "Push operator image"
+  shell: "make image-push-custom-registry"
+  args:
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  environment:
+    CUSTOM_REGISTRY_URL: "{{ registry_url }}"
+    CUSTOM_REGISTRY_NAMESPACE: "{{ registry_namespace }}"
+    CUSTOM_REGISTRY_TAG: "{{ registry_tag }}"
+  register: push_result
+
+- name: "Display push results"
+  debug:
+    msg: "Image push completed with return code: {{ push_result.rc }}"
+  when: push_result is defined 
