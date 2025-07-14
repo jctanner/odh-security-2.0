@@ -72,6 +72,9 @@ deployment:
   # Default namespace for OpenDataHub components
   namespace: "opendatahub"
   
+  # Deployment variant - "odh", "rhoai", or "odh-gateway"
+  variant: "odh-gateway"
+  
   # Timeout for waiting on resources to be ready (in seconds)
   wait_timeout: 300
   

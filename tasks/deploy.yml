@@ -35,6 +35,12 @@
       IMG: "{{ registry_url }}/{{ registry_namespace }}/odh-operator:{{ registry_tag }}"
   register: deploy_operator_result
 
+- name: "Set Gateway API environment variable on operator"
+  live_shell:
+    cmd: "kubectl set env deployment/opendatahub-operator-controller-manager -n opendatahub-operator-system ODH_GATEWAY_API={% if variant == 'odh-gateway' %}true{% else %}false{% endif %}"
+  register: set_gateway_env_result
+  when: variant is defined
+
 - name: "Wait for operator to be ready"
   live_shell:
     cmd: "kubectl wait --for=condition=Available deployment/opendatahub-operator-controller-manager -n opendatahub-operator-system --timeout={{ wait_timeout }}s"
