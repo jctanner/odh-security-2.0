@@ -160,9 +160,13 @@ class AnsibleEngine:
         if variables is None:
             variables = {}
         
-        # Merge with config variables
-        all_variables = self._config_to_variables()
-        all_variables.update(variables)
+        # Get all variables including config and runtime overrides
+        all_variables = self._config_to_variables(runtime_vars=variables)
+        
+        # Get the absolute path to the task file
+        task_file_path = self.get_task_file_path(task_name)
+        if not task_file_path:
+            raise ValueError(f"Task file '{task_name}' not found")
         
         playbook_data = [
             {
@@ -174,7 +178,7 @@ class AnsibleEngine:
                 'tasks': [
                     {
                         'name': f'Include {task_name} tasks',
-                        'include_tasks': f'{task_name}.yml'
+                        'include_tasks': task_file_path
                     }
                 ]
             }
@@ -200,7 +204,11 @@ class AnsibleEngine:
         print(f"Executing task: {task_name}")
         
         # Generate playbook content
-        playbook_content = self.generate_playbook(task_name, variables)
+        try:
+            playbook_content = self.generate_playbook(task_name, variables)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return False
         
         if verbose:
             print("Generated playbook:")
@@ -233,15 +241,9 @@ class AnsibleEngine:
                 cmd,
                 cwd=self.tasks_dir,
                 env=env,
-                capture_output=not verbose,
+                capture_output=False,  # Always stream output live for debugging
                 text=True
             )
-            
-            if not verbose and result.stdout:
-                print(result.stdout)
-            
-            if result.stderr:
-                print("Stderr:", result.stderr, file=sys.stderr)
             
             success = result.returncode == 0
             print(f"Task {task_name} {'succeeded' if success else 'failed'} (exit code: {result.returncode})")

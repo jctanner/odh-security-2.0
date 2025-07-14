@@ -355,6 +355,15 @@ This project has established a comprehensive development infrastructure for migr
     - Backwards-compatible CLI interface: same workflow commands work with new Ansible backend
     - Date: Current session
 
+36. **Ansible Debugging and Path Resolution** (Completed)
+    - Fixed AnsibleEngine to use absolute paths for include_tasks to prevent path resolution errors
+    - Updated task files to use proper chdir arguments for commands requiring specific working directories
+    - Enabled live stdout streaming for ansible-playbook execution to improve debugging experience
+    - Fixed temporary playbook generation to properly resolve task file paths
+    - Enhanced error handling to show proper failure messages when tasks fail
+    - All Ansible task execution now provides real-time output visibility
+    - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -398,6 +407,12 @@ This project has established a comprehensive development infrastructure for migr
 26. **Configuration Transparency**: Show which defaults were applied from configuration versus command-line arguments
 27. **Environment Variable Setting**: tool.py must set all required environment variables before calling make commands
 28. **Build Environment Isolation**: All configuration values must be passed to Makefile via environment variables, not shared files
+
+### **Ansible Task Execution**
+29. **Live Output Streaming**: Ansible task execution must stream output live to stdout for debugging purposes
+30. **Absolute Path Resolution**: AnsibleEngine must use absolute paths for include_tasks to avoid path resolution issues
+31. **Working Directory Management**: Ansible tasks must use proper chdir arguments for commands that require specific working directories
+32. **Playbook Generation**: AnsibleEngine must generate temporary playbooks with proper variable substitution and task file paths
 
 ## Negative Requirements
 *Explicit constraints on what we will NOT do*
@@ -532,4 +547,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-11 19:15 UTC - Major Architecture Migration to Ansible Complete* 
+*Last Updated: 2025-01-11 22:30 UTC - Ansible Debugging and Path Resolution Complete* 

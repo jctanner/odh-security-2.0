@@ -2,7 +2,9 @@
 # Ansible task file for building the OpenDataHub operator image from local checkouts
 
 - name: "Check build environment"
-  command: "python {{ project_root }}/tool.py show-config"
+  command: "python tool.py show-config"
+  args:
+    chdir: "{{ project_root }}"
   register: build_env_check
   
 - name: "Display build environment"
