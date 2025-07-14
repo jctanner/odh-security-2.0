@@ -204,6 +204,23 @@ This project has established a comprehensive development infrastructure for migr
     - All build targets now use environment variables with proper validation
     - Date: Current session
 
+23. **Build-and-Push Subcommand** (Completed)
+    - Added new build-and-push subcommand that combines build-operator --image + image-push in single operation
+    - Supports same flags as build-operator: --local, --use-branch, --custom-registry
+    - Two-step process: builds image first, then pushes if build succeeds
+    - Fails fast if build step fails, skipping push step
+    - Maintains existing separate build-operator and image-push commands for flexibility
+    - Updated help text and examples to include new workflow options
+    - Date: Current session
+
+24. **Config Defaults for All Build Commands** (Completed)
+    - Fixed inconsistency: build-and-push and image-push commands now apply config.yaml defaults
+    - All build commands (build-operator, build-and-push, image-push) consistently use config defaults
+    - Config defaults applied only when flags not explicitly provided by user
+    - Clear feedback showing which config defaults were applied
+    - Maintains command-line argument precedence over config defaults
+    - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -231,7 +248,7 @@ This project has established a comprehensive development infrastructure for migr
 15. **Environment Variables**: Consistent use of build arguments and environment variables
 16. **Command Visibility**: All build commands must show full execution details
 17. **Manifest Pre-population**: Local mode must pre-populate manifests before Docker build
-18. **Configuration-Driven Defaults**: Build commands must support config-driven defaults with command-line override capability
+18. **Configuration-Driven Defaults**: All build commands must support config-driven defaults with command-line override capability
 19. **Environment Variable Architecture**: Makefile must use environment variables exclusively, never parse config files directly
 20. **Environment Variable Validation**: All Makefile targets must validate required environment variables with helpful error messages
 21. **Configuration Separation**: tool.py handles configuration reading, Makefile handles build logic only
@@ -297,11 +314,11 @@ This project has established a comprehensive development infrastructure for migr
 - **Git Configuration**: .gitignore prevents committing src/ contents and token file
 - **Authentication**: Secure token file configured, git credential prompting disabled
 - **Configuration**: YAML config file with fork organization, branch settings, and build defaults
-- **Automation**: Multi-purpose Python tool for project management (tool.py)
+- **Automation**: Multi-purpose Python tool for project management (tool.py) with build-and-push workflow support
 - **Repository Setup**: All 15 required repositories forked, cloned, and configured with feature branches
 - **Target Repositories**: 15 repositories successfully set up with SSH origins and repository-specific base branches
 - **Multi-Repository Management**: forks-status and forks-commit commands for efficient change management
-- **Build System**: Fully operational with environment variable architecture, config-driven defaults, local checkout workflow, feature branch support, and custom registry integration
+- **Build System**: Fully operational with environment variable architecture, consistent config-driven defaults across all build commands, local checkout workflow, feature branch support, and custom registry integration
 - **Build System Testing**: Complete end-to-end testing confirmed - manifest pre-population, multi-stage Docker build, custom registry tagging all working
 - **Build Architecture**: Environment variable-based configuration with clean separation between tool.py (configuration) and Makefile (build logic)
 - **Current Architecture**: Analysis required - networking implementation unknown
@@ -379,4 +396,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-11 16:15 UTC - Makefile Environment Variable Refactoring Complete* 
+*Last Updated: 2025-01-11 16:45 UTC - Config Defaults Consistency Fixed* 

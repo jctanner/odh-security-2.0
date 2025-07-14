@@ -1487,6 +1487,8 @@ def cmd_setup_manifests(args):
             print(f"   - python3 tool.py build-operator  # Uses config defaults")
             print(f"   - python3 tool.py build-operator --local --use-branch --manifests-only")
             print(f"   - python3 tool.py build-operator --local --use-branch --image")
+            print(f"   - python3 tool.py build-and-push --local --use-branch --custom-registry")
+            print(f"   - python3 tool.py image-push --custom-registry")
             return 0
         
     except Exception as e:
@@ -1505,10 +1507,34 @@ def cmd_image_push(args):
             print("❌ opendatahub-operator not found. Run setup-operator first.")
             return 1
         
-        print("📤 Pushing container image...")
+        # Apply config defaults for image-push flags
+        build_defaults = gh.get_build_defaults()
         
-        # Determine push command based on arguments
-        if hasattr(args, 'custom_registry') and args.custom_registry:
+        # Apply defaults only if the flag wasn't explicitly provided
+        use_custom_registry = getattr(args, 'custom_registry', False) or build_defaults.get('custom_registry', False)
+        
+        # Override args with resolved values
+        args.custom_registry = use_custom_registry
+        
+        print("📤 Pushing container image...")
+        print(f"   Custom registry: {args.custom_registry}")
+        
+        # Show which settings came from config defaults
+        config_applied = []
+        if build_defaults.get('custom_registry', False) and not hasattr(args, '_custom_registry_from_cli'):
+            config_applied.append("--custom-registry")
+        
+        if config_applied:
+            print(f"   Config defaults applied: {', '.join(config_applied)}")
+        
+        # Prepare environment variables for push
+        push_env = os.environ.copy()
+        
+        # Set custom registry environment variables if using custom registry
+        if args.custom_registry:
+            push_env['CUSTOM_REGISTRY_URL'] = gh.get_registry_url()
+            push_env['CUSTOM_REGISTRY_NAMESPACE'] = gh.get_registry_namespace()
+            push_env['CUSTOM_REGISTRY_TAG'] = gh.get_registry_tag()
             print(f"   Using custom registry: {gh.get_registry_url()}")
             print(f"   Namespace: {gh.get_registry_namespace()}")
             print(f"   Tag: {gh.get_registry_tag()}")
@@ -1524,6 +1550,7 @@ def cmd_image_push(args):
         result = subprocess.run(
             command,
             cwd=operator_path,
+            env=push_env,
             capture_output=False,
             text=True
         )
@@ -1537,6 +1564,84 @@ def cmd_image_push(args):
         
     except Exception as e:
         print(f"❌ Error pushing image: {e}")
+        return 1
+
+
+def cmd_build_and_push(args):
+    """Handle build-and-push subcommand - builds image and pushes in one operation"""
+    try:
+        gh = GitHubWrapper()
+        
+        print("🚀 Building and pushing container image...")
+        
+        # Apply config defaults for build-and-push flags
+        build_defaults = gh.get_build_defaults()
+        
+        # Apply defaults only if the flag wasn't explicitly provided
+        use_local = getattr(args, 'local', False) or build_defaults.get('local', False)
+        use_branch = getattr(args, 'use_branch', False) or build_defaults.get('use_branch', False)
+        use_custom_registry = getattr(args, 'custom_registry', False) or build_defaults.get('custom_registry', False)
+        
+        # Override args with resolved values
+        args.local = use_local
+        args.use_branch = use_branch
+        args.custom_registry = use_custom_registry
+        
+        print(f"🔧 Build and Push Settings:")
+        print(f"   Fork organization: {gh.get_fork_org()}")
+        print(f"   Local mode: {args.local}")
+        print(f"   Custom registry: {args.custom_registry}")
+        if args.use_branch:
+            print(f"   Using feature branch: {gh.get_branch_name()}")
+        
+        # Show which settings came from config defaults
+        config_applied = []
+        if build_defaults.get('local', False) and not hasattr(args, '_local_from_cli'):
+            config_applied.append("--local")
+        if build_defaults.get('use_branch', False) and not hasattr(args, '_use_branch_from_cli'):
+            config_applied.append("--use-branch")
+        if build_defaults.get('custom_registry', False) and not hasattr(args, '_custom_registry_from_cli'):
+            config_applied.append("--custom-registry")
+        
+        if config_applied:
+            print(f"   Config defaults applied: {', '.join(config_applied)}")
+        
+        # First, build the image
+        # Force image mode for build
+        build_args = type('BuildArgs', (), {
+            'local': args.local,
+            'use_branch': args.use_branch,
+            'custom_registry': args.custom_registry,
+            'manifests_only': False,  # Always build image, not just manifests
+            'image': True  # Always build image
+        })()
+        
+        print("🔨 Step 1: Building container image...")
+        build_result = cmd_build_operator(build_args)
+        
+        if build_result != 0:
+            print("❌ Build failed, skipping push step")
+            return build_result
+        
+        print("✅ Build completed successfully!")
+        
+        # Then, push the image
+        push_args = type('PushArgs', (), {
+            'custom_registry': args.custom_registry
+        })()
+        
+        print("📤 Step 2: Pushing container image...")
+        push_result = cmd_image_push(push_args)
+        
+        if push_result == 0:
+            print("🎉 Build and push completed successfully!")
+        else:
+            print("❌ Push failed!")
+            
+        return push_result
+        
+    except Exception as e:
+        print(f"❌ Error in build-and-push: {e}")
         return 1
 
 
@@ -1784,6 +1889,11 @@ Examples:
         %(prog)s build-operator --use-branch --manifests-only
         %(prog)s build-operator --local --use-branch
         %(prog)s build-operator --image --local --use-branch --custom-registry
+  %(prog)s build-and-push
+  %(prog)s build-and-push --local
+  %(prog)s build-and-push --use-branch
+  %(prog)s build-and-push --custom-registry
+  %(prog)s build-and-push --local --use-branch --custom-registry
   %(prog)s image-push
   %(prog)s image-push --custom-registry
   %(prog)s list-repos opendatahub-io
@@ -1945,6 +2055,28 @@ Note: This tool can be run from anywhere within the project directory tree.
         help='Use custom registry settings from config.yaml'
     )
     build_operator_parser.set_defaults(func=cmd_build_operator)
+    
+    # build-and-push subcommand
+    build_and_push_parser = subparsers.add_parser(
+        'build-and-push',
+        help='Build and push container image in one operation (combines build-operator --image + image-push)'
+    )
+    build_and_push_parser.add_argument(
+        '--local',
+        action='store_true',
+        help='Use local checkouts for manifest sources instead of cloning'
+    )
+    build_and_push_parser.add_argument(
+        '--use-branch',
+        action='store_true',
+        help='Use feature branch from config.yaml instead of main branch'
+    )
+    build_and_push_parser.add_argument(
+        '--custom-registry',
+        action='store_true',
+        help='Use custom registry settings from config.yaml for build and push'
+    )
+    build_and_push_parser.set_defaults(func=cmd_build_and_push)
     
     # image-push subcommand
     image_push_parser = subparsers.add_parser(
