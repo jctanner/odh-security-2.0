@@ -16,7 +16,7 @@ description:
     - Useful for long-running build processes where you want to see progress
 version_added: "1.0.0"
 options:
-    _raw_params:
+    cmd:
         description:
             - The shell command to execute
         type: str
@@ -37,14 +37,15 @@ author:
 
 EXAMPLES = r'''
 - name: Run a build command with live output
-  live_shell: make build
-  args:
+  live_shell:
+    cmd: make build
     chdir: /path/to/project
     environment:
       BUILD_ENV: production
 
 - name: Simple command with live output
-  live_shell: echo "Hello World"
+  live_shell:
+    cmd: echo "Hello World"
 '''
 
 RETURN = r'''
@@ -72,12 +73,11 @@ def main():
     """Main module function - this is just a placeholder since the action plugin does the real work"""
     module = AnsibleModule(
         argument_spec=dict(
-            _raw_params=dict(type='str', required=True),
+            cmd=dict(type='str', required=True),
             chdir=dict(type='path', required=False),
             environment=dict(type='dict', required=False),
         ),
         supports_check_mode=False,
-        supports_raw_params=True,
     )
     
     # This module should never be called directly - the action plugin handles execution

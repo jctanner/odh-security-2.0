@@ -89,6 +89,13 @@ class AnsibleEngine:
                 'build_manifests_only': build_config.get('manifests_only'),
             })
         
+        # Add deployment defaults
+        deployment_config = self.config.get('deployment', {})
+        variables.update({
+            'namespace': deployment_config.get('namespace', 'opendatahub'),
+            'wait_timeout': deployment_config.get('wait_timeout', 300),
+        })
+        
         # Add runtime variable overrides
         if runtime_vars:
             variables.update(runtime_vars)

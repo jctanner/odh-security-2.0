@@ -19,7 +19,6 @@ class ActionModule(ActionBase):
     
     TRANSFERS_FILES = False
     _requires_connection = False
-    supports_raw_params = True
     
     def run(self, tmp=None, task_vars=None):
         """Execute shell command with live output streaming"""
@@ -29,10 +28,10 @@ class ActionModule(ActionBase):
         del tmp  # tmp no longer has any effect
         
         # Get the shell command from task args
-        command = self._task.args.get('_raw_params', '')
+        command = self._task.args.get('cmd', '')
         if not command:
             result['failed'] = True
-            result['msg'] = 'Command parameter is required'
+            result['msg'] = 'cmd parameter is required'
             return result
         
         # Get working directory (chdir)
@@ -47,8 +46,8 @@ class ActionModule(ActionBase):
             for key, value in task_env.items():
                 env[key] = self._templar.template(str(value), task_vars)
         
-        # Template the command
-        templated_command = self._templar.template(command, task_vars)
+        # Command is already templated by Ansible before reaching action plugin
+        templated_command = command
         
         # Display what we're running
         display.vv(f"TASK OUTPUT: Running command: {templated_command}")

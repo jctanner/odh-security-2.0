@@ -2,13 +2,17 @@
 # Simple test to verify output streaming works
 
 - name: "Test live output with echo"
-  live_shell: "echo 'Hello from live_shell action plugin!'"
+  live_shell:
+    cmd: "echo 'Hello from live_shell action plugin!'"
 
 - name: "Test live output with multiple lines"
-  live_shell: "echo 'Line 1'; sleep 1; echo 'Line 2'; sleep 1; echo 'Line 3'"
+  live_shell:
+    cmd: "echo 'Line 1'; sleep 1; echo 'Line 2'; sleep 1; echo 'Line 3'"
 
 - name: "Test live output with pwd"
-  live_shell: "pwd"
+  live_shell:
+    cmd: "pwd"
 
 - name: "Test live output with environment"
-  live_shell: "echo 'Current user:' && whoami" 
+  live_shell:
+    cmd: "echo 'Current user:' && whoami" 
