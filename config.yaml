@@ -72,9 +72,6 @@ deployment:
   # Default namespace for OpenDataHub components
   namespace: "opendatahub"
   
-  # Deployment variant - "odh", "rhoai", or "odh-gateway"
-  variant: "odh-gateway"
-  
   # Timeout for waiting on resources to be ready (in seconds)
   wait_timeout: 300
   
@@ -92,6 +89,8 @@ deployment:
       #     metricsCollection: "Istio"
       #     name: "data-science-smcp"
       #     namespace: "istio-system"
+      networking:
+        mode: "gateway-api"  # "standard" or "gateway-api"
       trustedCABundle:
         managementState: "Managed"
         customCABundle: ""
