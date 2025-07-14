@@ -6,9 +6,14 @@
     cmd: "kubectl get namespace {{ namespace }} {% raw %}||{% endraw %} kubectl create namespace {{ namespace }}"
   register: create_namespace_result
 
+- name: "Create operator namespace"
+  live_shell:
+    cmd: "kubectl get namespace opendatahub-operator-system {% raw %}||{% endraw %} kubectl create namespace opendatahub-operator-system"
+  register: create_operator_namespace_result
+
 - name: "Check if operator already deployed"
   live_shell:
-    cmd: "kubectl get deployment opendatahub-operator -n {{ namespace }}"
+    cmd: "kubectl get deployment opendatahub-operator-controller-manager -n opendatahub-operator-system"
   register: check_operator_result
   failed_when: false
 
@@ -16,50 +21,62 @@
   debug:
     msg: "Operator deployment status: {{ 'EXISTS' if check_operator_result.rc == 0 else 'NOT FOUND' }}"
 
+- name: "Install CRDs"
+  live_shell:
+    cmd: "make install"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  register: install_crds_result
+
 - name: "Deploy operator"
   live_shell:
-    cmd: "kubectl apply -f deployments/operator.yaml -n {{ namespace }}"
+    cmd: "make deploy"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+    environment:
+      IMG: "{{ registry_url }}/{{ registry_namespace }}/odh-operator:{{ registry_tag }}"
   register: deploy_operator_result
 
 - name: "Wait for operator to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Available deployment/opendatahub-operator -n {{ namespace }} --timeout={{ wait_timeout }}s"
+    cmd: "kubectl wait --for=condition=Available deployment/opendatahub-operator-controller-manager -n opendatahub-operator-system --timeout={{ wait_timeout }}s"
   register: wait_operator_result
 
 - name: "Deploy DSCI"
   live_shell:
-    cmd: "kubectl apply -f deployments/dsci.yaml -n {{ namespace }}"
+    cmd: "kubectl apply -f config/samples/dscinitialization_v1_dscinitialization.yaml -n {{ namespace }}"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
   register: deploy_dsci_result
 
 - name: "Wait for DSCI to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Ready datascienceclusterinitializations.opendatahub.io/default-dsci -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
+    cmd: "kubectl wait --for=condition=Ready dscinitializations.dscinitialization.opendatahub.io/default-dsci -n {{ namespace }} --timeout={{ wait_timeout }}s"
   register: wait_dsci_result
 
 - name: "Deploy DSC"
   live_shell:
-    cmd: "kubectl apply -f deployments/dsc.yaml -n {{ namespace | default('opendatahub') }}"
+    cmd: "kubectl apply -f config/samples/datasciencecluster_v1_datasciencecluster.yaml -n {{ namespace }}"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
   register: deploy_dsc_result
 
 - name: "Wait for DSC to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Ready datascienceclusters.opendatahub.io/default-dsc -n {{ namespace | default('opendatahub') }} --timeout={{ wait_timeout | default('300') }}s"
+    cmd: "kubectl wait --for=condition=Ready datascienceclusters.datasciencecluster.opendatahub.io/default-dsc -n {{ namespace }} --timeout={{ wait_timeout }}s"
   register: wait_dsc_result
 
 - name: "Check operator status"
   live_shell:
-    cmd: "kubectl get deployment opendatahub-operator -n {{ namespace | default('opendatahub') }}"
+    cmd: "kubectl get deployment opendatahub-operator-controller-manager -n opendatahub-operator-system"
   register: final_operator_status
 
 - name: "Check DSC status"
   live_shell:
-    cmd: "kubectl get datascienceclusters.opendatahub.io -n {{ namespace | default('opendatahub') }}"
+    cmd: "kubectl get datascienceclusters.datasciencecluster.opendatahub.io -n {{ namespace }}"
   register: final_dsc_status
 
 - name: "Display deployment summary"
   debug:
     msg:
       - "Deployment completed successfully!"
-      - "Namespace: {{ namespace | default('opendatahub') }}"
+      - "Operator Namespace: opendatahub-operator-system"
+      - "Target Namespace: {{ namespace }}"
       - "Operator Status: {{ final_operator_status.stdout_lines }}"
       - "DSC Status: {{ final_dsc_status.stdout_lines }}" 
