@@ -1,0 +1,10 @@
+name: "Build and Push OpenDataHub Operator"
+description: "Build and push the OpenDataHub operator image to registry"
+
+# Include build and push workflows
+includes:
+  - "build"
+  - "push"
+
+# No additional steps needed - everything is handled by included workflows
+steps: [] 

@@ -1,0 +1,21 @@
+name: "Build OpenDataHub Operator"
+description: "Build the OpenDataHub operator image from local checkouts"
+
+steps:
+  - name: "Check build environment"
+    type: "tool"
+    command: "show-config"
+    args: []
+    
+  - name: "Build operator image"
+    type: "tool"
+    command: "build-operator"
+    args: 
+      - "--image"
+      - "--local"
+      - "--use-branch"
+      - "--custom-registry"
+    env:
+      CUSTOM_REGISTRY_URL: "${REGISTRY_URL}"
+      CUSTOM_REGISTRY_NAMESPACE: "${REGISTRY_NAMESPACE}"
+      CUSTOM_REGISTRY_TAG: "${REGISTRY_TAG}" 

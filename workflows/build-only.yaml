@@ -1,0 +1,32 @@
+name: "Build OpenDataHub Operator (Extended)"
+description: "Build the OpenDataHub operator image with additional status checks"
+
+# Include the main build workflow
+includes:
+  - "build"
+
+# Variables are automatically loaded from config.yaml
+# You can override specific values here if needed:
+# variables:
+#   REGISTRY_TAG: "custom-tag"
+
+steps:
+  - name: "Check repository status"
+    type: "tool"
+    command: "forks-status"
+    args: 
+      - "--dirty"
+    
+  - name: "Build manifests from local checkouts"
+    type: "tool"
+    command: "build-operator"
+    args:
+      - "--local"
+      - "--use-branch"
+      - "--manifests-only"
+    
+  - name: "Show build results"
+    type: "shell"
+    command: "echo"
+    args:
+      - "Build completed successfully!" 

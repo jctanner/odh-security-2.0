@@ -231,6 +231,72 @@ This project has established a comprehensive development infrastructure for migr
     - All functionality preserved and tested working
     - Date: Current session
 
+26. **New Class Architecture: WorkflowEngine, BuildManager, DeploymentManager** (Completed)
+    - Created WorkflowEngine class (lib/workflow_engine.py) for executing custom YAML workflows
+    - Created BuildManager class (lib/build_manager.py) for centralized build operations management
+    - Created DeploymentManager class (lib/deployment_manager.py) for Kubernetes deployment operations
+    - Added comprehensive configuration classes: WorkflowStep, WorkflowDefinition, BuildConfig, BuildResult, DeploymentConfig, DeploymentResult
+    - WorkflowEngine supports kubectl, tool, shell, and nested workflow execution with real-time output
+    - BuildManager provides structured build operations with proper error handling and environment management
+    - DeploymentManager handles operator, DSCI, DSC deployment/undeployment with status checking
+    - Updated lib/__init__.py to export all new classes and data structures
+    - Created sample workflows: build-only.yaml (5 steps), build-push-deploy.yaml (12 steps)
+    - Added workflows/ directory for YAML workflow definitions
+    - All classes tested and import successfully
+    - Date: Current session
+
+27. **WorkflowEngine Config Integration** (Completed)
+    - Enhanced WorkflowEngine to automatically load config.yaml and make values available as workflow variables
+    - Implemented flattened variable naming: github.fork_org → GITHUB_FORK_ORG with convenient aliases (FORK_ORG)
+    - Added variable precedence system: config < workflow < runtime with proper merging
+    - Simplified workflow files by removing redundant variable declarations - values come from config.yaml
+    - Added debugging methods: show_available_variables(), preview_workflow_variables() for workflow development
+    - Updated sample workflows to use config.yaml variables instead of hardcoded values
+    - Variable categories: GitHub, Registry, Build, Migration, Project, plus convenient aliases
+    - All config.yaml sections automatically available to workflows with proper type conversion
+    - Date: Current session
+
+28. **Modular Workflow Includes** (Completed)
+    - Added workflow include functionality to eliminate duplication across workflow files
+    - Implemented recursive include processing with circular dependency detection
+    - Created modular workflow components: build.yaml, push.yaml, deploy.yaml, build-push.yaml
+    - Enhanced WorkflowDefinition with includes field for tracking included workflows
+    - Variable merging: included workflows < main workflow with proper precedence
+    - Step merging: included workflow steps execute first, then main workflow steps
+    - Updated build-push-deploy.yaml to use includes instead of duplicate steps (13 steps from 3 includes)
+    - Updated build-only.yaml to extend build.yaml with additional steps
+    - Proper error handling for missing included workflows with warning messages
+    - All workflow types now support includes: build (2 steps), push (1 step), deploy (10 steps)
+    - Date: Current session
+
+29. **Workflow Commands in tool.py** (Completed)
+    - Added 4 new workflow subcommands to tool.py for complete workflow management
+    - list-workflows: Display all available workflows with descriptions and step counts
+    - show-workflow: Show detailed workflow information including steps, variables, and includes
+    - run-workflow: Execute workflows with runtime variable override support (--var KEY=VALUE)
+    - workflow-vars: Display available variables from config.yaml and workflow-specific variables
+    - Integrated WorkflowEngine import into tool.py with proper error handling
+    - Added comprehensive help text and examples for all workflow commands
+    - Full CLI integration: workflows can now be executed directly from command line
+    - Runtime variable support: override any config or workflow variable at execution time
+    - Verbose mode support: detailed execution logging when using --verbose flag
+    - All commands tested and working: workflow listing, details, variable preview, and execution
+    - Date: Current session
+
+30. **Hierarchical Workflow Commands** (Completed)
+    - Refactored workflow commands from flat structure to hierarchical sub-sub commands
+    - Single workflow subcommand with multiple operations: --list, --show, --vars, --name/--exec
+    - Clean command structure: ./tool.py workflow --list, ./tool.py workflow --show <name>
+    - Execute workflows: ./tool.py workflow --name <name> --exec --var KEY=VALUE
+    - View variables: ./tool.py workflow --vars [<name>] for all or specific workflow variables
+    - Mutually exclusive argument groups for clear operation selection
+    - Validation: --name requires --exec flag for workflow execution
+    - Updated help text and examples to reflect new hierarchical structure
+    - All functionality preserved: listing, showing, variable preview, and execution with overrides
+    - Improved UX: grouped related commands under single workflow namespace
+    - Successfully tested: all operations work correctly with new command structure
+    - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -319,12 +385,14 @@ This project has established a comprehensive development infrastructure for migr
 ## Technical State
 *Current codebase and configuration status*
 
-- **Files**: 7 (CONTEXT.md, src/, lib/, .gitignore, .github_token, tool.py, config.yaml)
-- **Structure**: src/ directory for GitHub project checkouts with 15 repositories, lib/ directory for Python modules
+- **Files**: 11 (CONTEXT.md, src/, lib/, workflows/, .gitignore, .github_token, tool.py, config.yaml)
+- **Structure**: src/ directory for GitHub project checkouts with 15 repositories, lib/ directory for Python modules, workflows/ directory for YAML workflow definitions
 - **Git Configuration**: .gitignore prevents committing src/ contents and token file
 - **Authentication**: Secure token file configured, git credential prompting disabled
 - **Configuration**: YAML config file with fork organization, branch settings, and build defaults
 - **Automation**: Modular Python tool with lib/github_wrapper.py (924 lines) and tool.py CLI interface (1083 lines)
+- **Class Architecture**: WorkflowEngine (375 lines), BuildManager (350 lines), DeploymentManager (717 lines) for comprehensive workflow, build, and deployment management
+- **Workflow System**: Custom YAML workflow format with 6 modular workflows (build, push, deploy, build-push, build-only, build-push-deploy) supporting kubectl, tool, shell, nested workflow execution, and includes
 - **Repository Setup**: All 15 required repositories forked, cloned, and configured with feature branches
 - **Target Repositories**: 15 repositories successfully set up with SSH origins and repository-specific base branches
 - **Multi-Repository Management**: forks-status and forks-commit commands for efficient change management
@@ -333,8 +401,8 @@ This project has established a comprehensive development infrastructure for migr
 - **Build Architecture**: Environment variable-based configuration with clean separation between tool.py (configuration) and Makefile (build logic)
 - **Current Architecture**: Analysis required - networking implementation unknown
 - **Target Architecture**: Gateway API (migration approach to be determined)
-- **Dependencies**: GitHub CLI ('gh'), Python 3.6+, PyYAML, podman/docker
-- **Testing**: Build system fully tested and operational, application testing pending analysis
+- **Dependencies**: GitHub CLI ('gh'), Python 3.6+, PyYAML, podman/docker, kubectl (for deployment workflows)
+- **Testing**: Build system fully tested and operational, new classes tested for import compatibility
 
 ## Architecture Decisions
 *Record significant technical decisions and rationale*

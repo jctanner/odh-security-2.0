@@ -58,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
 # Import from lib directory
 from github_wrapper import GitHubWrapper, RepoInfo
+from workflow_engine import WorkflowEngine
 
 
 def cmd_whoami(args):
@@ -815,6 +816,145 @@ def cmd_forks_commit(args):
         return 1
 
 
+def cmd_workflow(args):
+    """Handle workflow subcommand with various operations"""
+    try:
+        workflow_engine = WorkflowEngine()
+        
+        # Determine which operation to perform based on flags
+        if args.list:
+            # List all workflows
+            workflows = workflow_engine.list_workflows()
+            
+            if not workflows:
+                print("No workflows found in workflows/ directory")
+                return
+            
+            print("Available workflows:")
+            print()
+            
+            for workflow_name in workflows:
+                try:
+                    workflow = workflow_engine.load_workflow(workflow_name)
+                    includes_info = f" (includes: {', '.join(workflow.includes)})" if workflow.includes else ""
+                    print(f"  {workflow_name}")
+                    print(f"    Name: {workflow.name}")
+                    print(f"    Description: {workflow.description}")
+                    print(f"    Steps: {len(workflow.steps)}{includes_info}")
+                    print()
+                except Exception as e:
+                    print(f"  {workflow_name}")
+                    print(f"    Error: Could not load workflow: {e}")
+                    print()
+        
+        elif args.show:
+            # Show workflow details
+            workflow = workflow_engine.load_workflow(args.show)
+            
+            print(f"Workflow: {workflow.name}")
+            print(f"Description: {workflow.description}")
+            print()
+            
+            if workflow.includes:
+                print(f"Includes: {', '.join(workflow.includes)}")
+                print()
+            
+            if workflow.variables:
+                print("Workflow Variables:")
+                for key, value in workflow.variables.items():
+                    print(f"  {key}: {value}")
+                print()
+            
+            print(f"Steps ({len(workflow.steps)}):")
+            for i, step in enumerate(workflow.steps, 1):
+                print(f"  {i}. {step.name}")
+                print(f"     Type: {step.type}")
+                print(f"     Command: {step.command}")
+                if step.args:
+                    print(f"     Args: {step.args}")
+                if step.env:
+                    print(f"     Environment: {step.env}")
+                if step.ignore_errors:
+                    print(f"     Ignore Errors: {step.ignore_errors}")
+                if step.condition:
+                    print(f"     Condition: {step.condition}")
+                print()
+        
+        elif args.vars is not None:
+            # Show workflow variables
+            if args.vars:
+                # Show variables for specific workflow
+                print(f"Variables for workflow '{args.vars}':")
+                print()
+                
+                final_vars = workflow_engine.preview_workflow_variables(args.vars)
+                
+                # Group variables by source
+                config_vars = workflow_engine.get_available_variables()
+                workflow_obj = workflow_engine.load_workflow(args.vars)
+                workflow_vars = workflow_obj.variables or {}
+                
+                print("From config.yaml:")
+                for key, value in sorted(config_vars.items()):
+                    if key not in workflow_vars:
+                        print(f"  {key}: {value}")
+                
+                if workflow_vars:
+                    print("\nFrom workflow definition:")
+                    for key, value in sorted(workflow_vars.items()):
+                        print(f"  {key}: {value}")
+                
+                print(f"\nFinal merged variables ({len(final_vars)}):")
+                for key, value in sorted(final_vars.items()):
+                    print(f"  {key}: {value}")
+            else:
+                # Show all available config variables
+                workflow_engine.show_available_variables()
+        
+        elif args.name:
+            if not args.exec:
+                print("Error: --name requires --exec to execute the workflow")
+                return 1
+            # Execute workflow
+            # Parse runtime variables
+            runtime_vars = {}
+            if args.var:
+                for var_def in args.var:
+                    if '=' not in var_def:
+                        print(f"Error: Invalid variable format '{var_def}'. Use KEY=VALUE")
+                        return 1
+                    key, value = var_def.split('=', 1)
+                    runtime_vars[key] = value
+            
+            if args.verbose:
+                print(f"Running workflow: {args.name}")
+                if runtime_vars:
+                    print("Runtime variables:")
+                    for key, value in runtime_vars.items():
+                        print(f"  {key}: {value}")
+                print()
+            
+            # Execute the workflow
+            success = workflow_engine.execute_workflow(args.name, runtime_vars)
+            
+            if success:
+                print(f"\n✓ Workflow '{args.name}' completed successfully!")
+                return 0
+            else:
+                print(f"\n✗ Workflow '{args.name}' failed!")
+                return 1
+        
+        else:
+            print("Error: Must specify one of --list, --show, --vars, or --name with --exec")
+            return 1
+        
+    except FileNotFoundError as e:
+        print(f"Error: Workflow not found: {e}")
+        return 1
+    except Exception as e:
+        print(f"Error in workflow operation: {e}")
+        return 1
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -849,6 +989,13 @@ Examples:
   %(prog)s build-and-push --local --use-branch --custom-registry
   %(prog)s image-push
   %(prog)s image-push --custom-registry
+  %(prog)s workflow --list
+  %(prog)s workflow --show build-push-deploy
+  %(prog)s workflow --name build --exec
+  %(prog)s workflow --name build-push-deploy --exec --var REGISTRY_TAG=dev
+  %(prog)s workflow --name deploy --exec --var NAMESPACE=test
+  %(prog)s workflow --vars
+  %(prog)s workflow --vars build-push-deploy
   %(prog)s list-repos opendatahub-io
   %(prog)s fork-repo opendatahub-io/odh-dashboard --clone
   %(prog)s fork-all --clone
@@ -1064,6 +1211,57 @@ Note: This tool can be run from anywhere within the project directory tree.
         help='Commit message (default: "Gateway API migration changes")'
     )
     forks_commit_parser.set_defaults(func=cmd_forks_commit)
+    
+    # Workflow subcommand with multiple operations
+    workflow_parser = subparsers.add_parser(
+        'workflow',
+        help='Workflow management operations'
+    )
+    
+    # Create mutually exclusive group for main operations
+    workflow_group = workflow_parser.add_mutually_exclusive_group(required=True)
+    
+    workflow_group.add_argument(
+        '--list',
+        action='store_true',
+        help='List all available workflows'
+    )
+    
+    workflow_group.add_argument(
+        '--show',
+        metavar='NAME',
+        help='Show details of a specific workflow'
+    )
+    
+    workflow_group.add_argument(
+        '--vars',
+        nargs='?',
+        const='',
+        metavar='NAME',
+        help='Show workflow variables (all config vars if no name specified)'
+    )
+    
+    workflow_group.add_argument(
+        '--name',
+        metavar='NAME',
+        help='Specify workflow name for execution (requires --exec)'
+    )
+    
+    # Additional flags for workflow execution
+    workflow_parser.add_argument(
+        '--exec',
+        action='store_true',
+        help='Execute the workflow specified by --name'
+    )
+    
+    workflow_parser.add_argument(
+        '--var',
+        action='append',
+        metavar='KEY=VALUE',
+        help='Set workflow variables (format: KEY=VALUE). Can be used multiple times.'
+    )
+    
+    workflow_parser.set_defaults(func=cmd_workflow)
     
     args = parser.parse_args()
     
