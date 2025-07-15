@@ -462,6 +462,25 @@ This project has established a comprehensive development infrastructure for migr
    - Decision: Keeping cert-manager as hard dependency for now, future work to implement optional pattern
    - Date: Current session
 
+45. **Cleanup-Build-Push-Deploy Workflow** (Completed)
+   - Created new cleanup-build-push-deploy.yml task file for complete development cycle workflow
+   - Combines all four modular workflows: cleanup, build, push, deploy in sequence
+   - Uses include_tasks to leverage existing tested workflow components
+   - Provides complete fresh-start development cycle: clean existing deployment, build new operator, push to registry, deploy fresh instance
+   - Automatically available through tool.py workflow system with live output streaming
+   - Perfect for development iterations requiring clean deployment from scratch
+   - Date: Current session
+
+46. **Missing GatewayClass and Gateway Resources** (Completed)
+   - Identified that Gateway controller is running but no GatewayClass or Gateway resources are being created
+   - Created PROBLEM_5.md documenting missing resource creation in Gateway controller
+   - Root cause: Gateway controller lacks actions to create GatewayClass and Gateway service resources
+   - Discovery: Controller has template and cert-manager actions but missing GatewayClass creation and Gateway service resource trigger
+   - Impact: Gateway API migration blocked - no actual Gateway resources for HTTPRoutes to reference
+   - Requirements: Add createGatewayClass and createGatewayServiceResource actions to controller
+   - Solution: Update action chain to create Istio GatewayClass and Gateway service resources automatically
+   - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -566,14 +585,14 @@ This project has established a comprehensive development infrastructure for migr
 ## Technical State
 *Current codebase and configuration status*
 
-- **Files**: 18 (CONTEXT.md, README.md, requirements.txt, src/, lib/, tasks/, action_plugins/, library/, .gitignore, .github_token, tool.py, config.yaml, ansible.cfg, PROBLEM_1.md, PROBLEM_2.md, PROBLEM_3.md, PROBLEM_4.md)
+- **Files**: 20 (CONTEXT.md, README.md, requirements.txt, src/, lib/, tasks/, action_plugins/, library/, .gitignore, .github_token, tool.py, config.yaml, ansible.cfg, PROBLEM_1.md, PROBLEM_2.md, PROBLEM_3.md, PROBLEM_4.md, PROBLEM_5.md, tasks/cleanup-build-push-deploy.yml)
 - **Structure**: src/ directory for GitHub project checkouts with 15 repositories, lib/ directory for Python modules, tasks/ directory for Ansible task definitions, action_plugins/ and library/ for custom Ansible plugins, Gateway controller implementation in opendatahub-operator
 - **Git Configuration**: .gitignore prevents committing src/ contents, venv/, and Ansible artifacts
 - **Authentication**: Secure token file configured, git credential prompting disabled
 - **Configuration**: YAML config file with fork organization, branch settings, build defaults, and deployment configuration (DSCI/DSC)
 - **Automation**: Modular Python tool with lib/github_wrapper.py (924 lines) and tool.py CLI interface (1061 lines)
 - **Class Architecture**: AnsibleEngine (300+ lines), BuildManager (350 lines), DeploymentManager (717 lines) for comprehensive Ansible-based workflow, build, and deployment management
-- **Task System**: Ansible-based task files with 7 modular tasks (build, push, deploy, cleanup, test, build-push, build-push-deploy) supporting native Ansible modules and custom live_shell action plugin for real-time output streaming
+- **Task System**: Ansible-based task files with 8 modular tasks (build, push, deploy, cleanup, test, build-push, build-push-deploy, cleanup-build-push-deploy) supporting native Ansible modules and custom live_shell action plugin for real-time output streaming
 - **Custom Plugins**: live_shell action plugin with proper module/action plugin pair for real-time command output streaming
 - **Repository Setup**: All 15 required repositories forked, cloned, and configured with feature branches
 - **Target Repositories**: 15 repositories successfully set up with SSH origins and repository-specific base branches
@@ -651,10 +670,18 @@ This project has established a comprehensive development infrastructure for migr
    - Solution: Use self-signed certificates as default, make cert-manager optional
    - Status: Keeping as hard dependency for now, future work to implement optional pattern
 
+8. **Missing GatewayClass and Gateway Resources** (🔄 Active)
+   - Gateway controller running but no GatewayClass or Gateway resources created
+   - Root cause: Controller lacks actions to create GatewayClass and Gateway service resources
+   - Impact: Gateway API migration blocked - no Gateway resources for HTTPRoutes to reference
+   - Requirements: Add createGatewayClass and createGatewayServiceResource actions
+   - Solution: Update controller action chain to create Istio GatewayClass and Gateway service resources
+   - Status: PROBLEM_5.md created for investigation and resolution
+
 ## Next Steps
 *Immediate planned actions*
 
-1. **Gateway API HTTPRoute Domain Resolution** (In Progress)
+1. **Gateway API Resource Creation** (In Progress)
    - ✅ Deploy Gateway controller with DSCI networking.mode: "gateway-api"
    - ✅ Identified and resolved DSCI null phase issue
    - ✅ Fixed Auth resource creation for OpenDataHubGateway platform
@@ -662,11 +689,11 @@ This project has established a comprehensive development infrastructure for migr
    - ✅ **PROBLEM_1.md - RESOLVED**: Gateway controller RBAC permissions issue fixed
    - ✅ **RBAC Fix Applied**: Added missing Gateway API and cert-manager permissions to role.yaml
    - ✅ **Controller Functioning**: No more RBAC forbidden errors, Gateway controller operational
-   - ✅ **PROBLEM_2.md Created**: HTTPRoute hostname validation issue with unresolved `$(dashboard-domain)` variable
-   - 🔄 **Next**: Fix domain variable substitution for HTTPRoute resources
-   - 🔄 Test namespace labeling and HTTPRoute security restrictions
-   - 🔄 Validate platform-aware domain resolution functionality
-   - 🔄 Test TLS certificate integration and Gateway listeners
+   - ✅ **PROBLEM_5.md Created**: Missing GatewayClass and Gateway resources issue identified
+   - 🔄 **Next**: Add createGatewayClass and createGatewayServiceResource actions to controller
+   - 🔄 Create Istio GatewayClass resource automatically
+   - 🔄 Create Gateway service resource to trigger controller
+   - 🔄 Test Gateway API resource creation and HTTPRoute routing
 
 2. **Repository Dependency Management** (✅ Complete)
    - ✅ Created setup-forks subcommand to fork all 15 required repositories
@@ -710,4 +737,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-15 18:30 UTC - cert-manager Dependency Analysis Complete* 
+*Last Updated: 2025-01-15 19:30 UTC - Missing GatewayClass and Gateway Resources Identified* 
