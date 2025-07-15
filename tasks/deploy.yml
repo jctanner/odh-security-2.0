@@ -27,6 +27,17 @@
     chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
   register: install_crds_result
 
+- name: "Install Gateway service CRD"
+  live_shell:
+    cmd: "kubectl apply -f config/crd/bases/services.platform.opendatahub.io_gateways.yaml"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  register: install_gateway_crd_result
+
+- name: "Install cert-manager CRDs"
+  live_shell:
+    cmd: "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.crds.yaml"
+  register: install_certmanager_crds_result
+
 - name: "Deploy operator"
   live_shell:
     cmd: "make deploy"
