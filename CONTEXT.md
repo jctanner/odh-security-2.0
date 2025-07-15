@@ -481,6 +481,16 @@ This project has established a comprehensive development infrastructure for migr
    - Solution: Update action chain to create Istio GatewayClass and Gateway service resources automatically
    - Date: Current session
 
+47. **Gateway Controller Actions Implementation** (Completed)
+   - Implemented createGatewayClass action to create Istio GatewayClass resource with controllerName: istio.io/gateway-controller
+   - Added GatewayClass RBAC permissions to kubebuilder annotations (gateway.networking.k8s.io/gatewayclasses)
+   - Updated gateway controller action chain to include createGatewayClass and createGatewayServiceResource actions
+   - Fixed compilation errors: TemplateInfo Variables field and GatewaySpec.GatewayClassName field issues
+   - Changed gateway class name from "openshift-default" to "istio" in generateGatewayClassName function
+   - Created Gateway service resource (gateway.services.platform.opendatahub.io/gateway) successfully
+   - Core functionality implemented but testing blocked by operator KfDef CRD issue preventing controller startup
+   - Date: Current session
+
 ## Established Requirements
 *Technical and operational requirements we must follow*
 
@@ -670,13 +680,22 @@ This project has established a comprehensive development infrastructure for migr
    - Solution: Use self-signed certificates as default, make cert-manager optional
    - Status: Keeping as hard dependency for now, future work to implement optional pattern
 
-8. **Missing GatewayClass and Gateway Resources** (🔄 Active)
+8. **Missing GatewayClass and Gateway Resources** (✅ Resolved)
    - Gateway controller running but no GatewayClass or Gateway resources created
    - Root cause: Controller lacks actions to create GatewayClass and Gateway service resources
    - Impact: Gateway API migration blocked - no Gateway resources for HTTPRoutes to reference
    - Requirements: Add createGatewayClass and createGatewayServiceResource actions
    - Solution: Update controller action chain to create Istio GatewayClass and Gateway service resources
-   - Status: PROBLEM_5.md created for investigation and resolution
+   - ✅ Resolved: Controller actions implemented, GatewayClass creation and Istio class name configured
+   - Status: PROBLEM_5.md implementation complete, testing blocked by operator KfDef issue
+
+9. **Operator KfDef CRD Issue** (🔄 Active)
+   - Operator crashing on startup due to missing KfDef CRD preventing all controllers from starting
+   - Root cause: Controller runtime expects KfDef CRD but it's not available in cluster
+   - Impact: Gateway controller cannot start to test implemented actions
+   - Error: "failed to wait for kfdef-controller caches to sync: no matches for kind \"KfDef\" in version \"kfdef.apps.kubeflow.org/v1\""
+   - Solution: Install KfDef CRD or remove KfDef controller dependency
+   - Status: Blocking all Gateway API migration testing
 
 ## Next Steps
 *Immediate planned actions*
@@ -689,10 +708,11 @@ This project has established a comprehensive development infrastructure for migr
    - ✅ **PROBLEM_1.md - RESOLVED**: Gateway controller RBAC permissions issue fixed
    - ✅ **RBAC Fix Applied**: Added missing Gateway API and cert-manager permissions to role.yaml
    - ✅ **Controller Functioning**: No more RBAC forbidden errors, Gateway controller operational
-   - ✅ **PROBLEM_5.md Created**: Missing GatewayClass and Gateway resources issue identified
-   - 🔄 **Next**: Add createGatewayClass and createGatewayServiceResource actions to controller
-   - 🔄 Create Istio GatewayClass resource automatically
-   - 🔄 Create Gateway service resource to trigger controller
+   - ✅ **PROBLEM_5.md - IMPLEMENTED**: Missing GatewayClass and Gateway resources actions implemented
+   - ✅ **Actions Added**: createGatewayClass and createGatewayServiceResource actions added to controller
+   - ✅ **Istio GatewayClass**: Controller configured to create Istio GatewayClass automatically
+   - ✅ **Gateway Service Resource**: Created Gateway service resource to trigger controller
+   - 🔄 **Next**: Resolve operator KfDef CRD issue to allow controller startup
    - 🔄 Test Gateway API resource creation and HTTPRoute routing
 
 2. **Repository Dependency Management** (✅ Complete)
@@ -737,4 +757,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-15 19:30 UTC - Missing GatewayClass and Gateway Resources Identified* 
+*Last Updated: 2025-01-15 20:15 UTC - Gateway Controller Actions Implementation Complete* 
