@@ -139,6 +139,28 @@ grep -r "OpenShift" src/opendatahub-operator/internal/controller/components/dash
 - Add OpenShift-specific domain resolution for Gateway API mode
 - Update platform detection to handle Gateway API routing
 
+## Deployment Process Notes
+
+### Make Target Dependency Chain
+The `make deploy` target has the following dependency chain:
+1. `deploy` depends on `prepare`
+2. `prepare` depends on `manifests kustomize manager-kustomization`
+3. `manifests` depends on `controller-gen`
+
+### What Gets Applied
+When `make deploy` runs, it executes:
+```bash
+$(KUSTOMIZE) build config/default | kubectl apply --namespace $(OPERATOR_NAMESPACE) -f -
+```
+
+This applies both:
+- **RBAC permissions** from `config/rbac/role.yaml` (including Gateway API permissions)
+- **Operator deployment** with updated image containing code fixes
+- **All other Kubernetes resources** (CRDs, Services, Webhooks)
+
+### Deployment Task Integration
+The Ansible deployment task uses the same kustomize approach, ensuring that both code changes and RBAC updates are applied together during the build-push-deploy workflow.
+
 ## Related Issues
 - PROBLEM_1.md: RBAC Permissions Issue (RESOLVED) - Prerequisite that blocked this issue
 - CONTEXT.md Item #40: Gateway API Migration Implementation and RBAC Fix
