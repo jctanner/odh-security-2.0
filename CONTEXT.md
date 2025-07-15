@@ -443,13 +443,24 @@ This project has established a comprehensive development infrastructure for migr
     - Date: Current session
 
 43. **HTTPRoute Domain Resolution Issue Discovery** (Completed)
-    - Discovered new issue after RBAC fix: HTTPRoute hostname validation errors
-    - Created PROBLEM_2.md to document HTTPRoute domain variable substitution issue
-    - Issue: HTTPRoute created with literal $(dashboard-domain) instead of resolved domain value
-    - Error: HTTPRoute hostname validation fails due to invalid DNS format
-    - Impact: Dashboard Gateway API routing blocked despite controller functioning
-    - Next phase: Fix domain variable substitution for Gateway API resources
-    - Date: Current session
+   - Discovered new issue after RBAC fix: HTTPRoute hostname validation errors
+   - Created PROBLEM_2.md to document HTTPRoute domain variable substitution issue
+   - Issue: HTTPRoute created with literal $(dashboard-domain) instead of resolved domain value
+   - Error: HTTPRoute hostname validation fails due to invalid DNS format
+   - Impact: Dashboard Gateway API routing blocked despite controller functioning
+   - Next phase: Fix domain variable substitution for Gateway API resources
+   - Date: Current session
+
+44. **cert-manager Dependency Analysis** (Completed)
+   - Analyzed cert-manager usage patterns across ODH component operators (kueue, odh-model-controller, feast)
+   - Created PROBLEM_4.md documenting component operator patterns vs ODH operator implementation
+   - Key finding: Component operators treat cert-manager as optional with alternatives (internalcert, manual certificates)
+   - Discovery: Gateway API only needs Secret with TLS certificate data - cert-manager just one way to create it
+   - Root cause: Controller-runtime automatically watches any imported API types, creating hard dependencies
+   - Identified three certificate management approaches: self-signed (default), manual, cert-manager (optional)
+   - Recommendation: Adopt component operator pattern with self-signed certificates as default
+   - Decision: Keeping cert-manager as hard dependency for now, future work to implement optional pattern
+   - Date: Current session
 
 ## Established Requirements
 *Technical and operational requirements we must follow*
@@ -555,7 +566,7 @@ This project has established a comprehensive development infrastructure for migr
 ## Technical State
 *Current codebase and configuration status*
 
-- **Files**: 17 (CONTEXT.md, README.md, requirements.txt, src/, lib/, tasks/, action_plugins/, library/, .gitignore, .github_token, tool.py, config.yaml, ansible.cfg)
+- **Files**: 18 (CONTEXT.md, README.md, requirements.txt, src/, lib/, tasks/, action_plugins/, library/, .gitignore, .github_token, tool.py, config.yaml, ansible.cfg, PROBLEM_1.md, PROBLEM_2.md, PROBLEM_3.md, PROBLEM_4.md)
 - **Structure**: src/ directory for GitHub project checkouts with 15 repositories, lib/ directory for Python modules, tasks/ directory for Ansible task definitions, action_plugins/ and library/ for custom Ansible plugins, Gateway controller implementation in opendatahub-operator
 - **Git Configuration**: .gitignore prevents committing src/ contents, venv/, and Ansible artifacts
 - **Authentication**: Secure token file configured, git credential prompting disabled
@@ -632,6 +643,14 @@ This project has established a comprehensive development infrastructure for migr
    - Impact: Dashboard Gateway API routing blocked despite controller functioning
    - Status: PROBLEM_2.md created for investigation and resolution
 
+7. **cert-manager Hard Dependency** (📋 Analyzed)
+   - ODH operator requires cert-manager CRDs and RBAC permissions even when not using cert-manager
+   - Root cause: Controller-runtime automatically watches any imported API types
+   - Impact: Deployment failures when cert-manager not available
+   - Analysis: PROBLEM_4.md documents component operator patterns and alternatives
+   - Solution: Use self-signed certificates as default, make cert-manager optional
+   - Status: Keeping as hard dependency for now, future work to implement optional pattern
+
 ## Next Steps
 *Immediate planned actions*
 
@@ -676,7 +695,14 @@ This project has established a comprehensive development infrastructure for migr
    - Validate component accessibility and functionality with Gateway API
    - Update component manifests to support both standard and gateway-api modes
 
-6. **Gateway API Migration Completion** (Future)
+6. **cert-manager Optional Pattern Implementation** (Future)
+   - Implement self-signed certificate generation as default
+   - Add runtime detection of cert-manager availability
+   - Create kustomize overlays for optional cert-manager integration
+   - Support manual certificate management through user-provided Secrets
+   - Remove cert-manager as hard dependency while maintaining optional support
+
+7. **Gateway API Migration Completion** (Future)
    - Document Gateway API migration approach and validation results
    - Create step-by-step migration guide with troubleshooting steps
    - Coordinate changes across dependent repositories if needed
@@ -684,4 +710,4 @@ This project has established a comprehensive development infrastructure for migr
    - Document any breaking changes or migration requirements
 
 ---
-*Last Updated: 2025-01-14 21:45 UTC - DSCI Null Phase Issue Resolved* 
+*Last Updated: 2025-01-15 18:30 UTC - cert-manager Dependency Analysis Complete* 
