@@ -676,7 +676,9 @@ def cmd_forks_commit(args):
 
                 # Push changes
                 print(f"    🚀 Pushing changes to origin {branch_name}...")
-                subprocess.run(["git", "push", "origin", branch_name], cwd=repo_dir, check=True)
+                subprocess.run(
+                    ["git", "push", "origin", branch_name], cwd=repo_dir, check=True
+                )
 
                 print(f"    ✅ Successfully committed and pushed changes")
                 results.append({"repo": repo_name, "status": "success"})
