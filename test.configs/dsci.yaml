@@ -1,0 +1,11 @@
+kind: DSCInitialization
+apiVersion: dscinitialization.opendatahub.io/v1
+metadata:
+  name: default-dsci
+spec:
+  applicationsNamespace: opendatahub
+  networking:
+    mode: 'gateway-api'
+  trustedCABundle:
+    customCABundle: ''
+    managementState: Managed

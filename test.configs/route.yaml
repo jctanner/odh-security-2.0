@@ -1,0 +1,23 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: odh-gateway-route
+  namespace: opendatahub
+  ownerReferences:
+  - apiVersion: v1
+    kind: Service
+    name: odh-gateway-service
+    uid: "20ee40fe-4741-4235-a4c0-49e9045e7d07"
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  host: odh-gateway.apps-crc.testing
+  to:
+    kind: Service
+    name: odh-gateway-service
+    weight: 100
+  port:
+    targetPort: 443
+  tls:
+    termination: passthrough
+    insecureEdgeTerminationPolicy: Redirect
