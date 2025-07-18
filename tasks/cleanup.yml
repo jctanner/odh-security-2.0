@@ -135,6 +135,16 @@
   register: cleanup_temp_files
   failed_when: false
 
+- name: "Remove the gateway and gateway class"
+  live_shell:
+    cmd: "kubectl delete gateway -n openshift-ingress odh-gateway; kubectl delete gatewayclass odh-gateway-class"
+  failed_when: false
+
+- name: "Remoe the certmanager secret"
+  live_shell:
+    cmd: "kubectl delete certificate -n openshift-ingress odh-gateway-tls; kubectl delete secret -n openshift-ingress odh-gateway-tls-secret"
+  failed_when: false
+
 - name: "Display cleanup summary"
   debug:
     msg:
