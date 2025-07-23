@@ -18,3 +18,6 @@ pip install -r requirements.txt
 # run the operator locally ...
 cd src/opendatahub-operator
 make run-nowebhook
+
+# setup the route + oauth-proxy in another terminal
+./create_oauth_setup.sh
