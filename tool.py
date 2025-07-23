@@ -858,7 +858,7 @@ Examples:
 
 Note: This tool can be run from anywhere within the project directory tree.
       It will automatically find config.yaml and .github_token files in the project root.
-        
+
 For build and deployment operations, use the Ansible-based task system:
   %(prog)s workflow --name build --exec                    # Build operator
   %(prog)s workflow --name build-push --exec               # Build and push
