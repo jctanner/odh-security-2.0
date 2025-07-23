@@ -148,6 +148,129 @@ def cmd_clone_repo(args):
         return 1
 
 
+def cmd_clone_forks(args):
+    """Handle clone-forks subcommand - clone all fork repositories"""
+    try:
+        gh = GitHubWrapper()
+        
+        print("🔄 Cloning all fork repositories...")
+        
+        # Step 1: Ensure opendatahub-operator is available for dependency parsing
+        operator_repo = "opendatahub-io/opendatahub-operator"
+        operator_local_path = gh.src_dir / "opendatahub-operator"
+        
+        if not operator_local_path.exists():
+            print(f"📋 First cloning {operator_repo} (required for manifest parsing)...")
+            try:
+                result = gh.clone_repository(operator_repo)
+                if result["cloned"]:
+                    print(f"✅ Operator cloned to: {result['local_path']}")
+                else:
+                    print(f"ℹ️  Operator already exists at: {result['local_path']}")
+            except Exception as e:
+                print(f"❌ Error cloning operator repository: {e}")
+                print("🔍 This repository is required to parse manifest dependencies")
+                return 1
+        else:
+            print(f"✅ Operator repository already available at: {operator_local_path}")
+        
+        # Step 2: Parse manifest repositories from get_all_manifests.sh
+        try:
+            print("📋 Parsing manifest dependencies...")
+            manifest_repos = gh.parse_manifest_repositories()
+            print(f"📋 Found {len(manifest_repos)} repositories in manifest dependencies")
+        except Exception as e:
+            print(f"❌ Error parsing manifest repositories: {e}")
+            return 1
+        
+        if args.dry_run:
+            print("\n🔍 DRY RUN - Would clone the following fork repositories:")
+            fork_org = gh.get_fork_org()
+            for repo_name, base_branch in manifest_repos.items():
+                fork_url = f"{fork_org}/{repo_name}"
+                local_path = gh.src_dir / repo_name
+                status = "exists" if local_path.exists() else "would clone"
+                print(f"  • {fork_url} (base: {base_branch}) - {status}")
+            return 0
+        
+        # Step 3: Clone all fork repositories and set them up
+        fork_org = gh.get_fork_org()
+        results = []
+        processed = 0
+        skipped = 0
+        
+        for repo_name, base_branch in manifest_repos.items():
+            fork_url = f"{fork_org}/{repo_name}"
+            original_repo = f"opendatahub-io/{repo_name}"
+            local_path = gh.src_dir / repo_name
+            
+            # Skip if local checkout exists and --skip-existing is set
+            if local_path.exists() and args.skip_existing:
+                print(f"⏭️  Skipping {fork_url} (local checkout exists)")
+                skipped += 1
+                continue
+            
+            try:
+                print(f"\n📂 Processing {fork_url}...")
+                processed += 1
+                
+                # Step 3a: Clone fork
+                print(f"  🔄 Cloning fork...")
+                result = gh.clone_repository(fork_url)
+                
+                if result["cloned"]:
+                    print(f"    ✅ Repository cloned to: {result['local_path']}")
+                else:
+                    print(f"    ℹ️  Repository already exists at: {result['local_path']}")
+                
+                # Step 3b: Setup upstream and rebase
+                print(f"  🔄 Setting up upstream and rebasing...")
+                repo_path = Path(result["local_path"])
+                upstream_url = f"https://github.com/{original_repo}"
+                gh.setup_upstream(repo_path, upstream_url)
+                
+                # Step 3c: Create or checkout feature branch
+                print(f"  🔄 Setting up feature branch...")
+                feature_branch = gh.get_branch_name()
+                
+                if not gh.branch_exists(repo_path, feature_branch):
+                    print(f"    🆕 Creating feature branch '{feature_branch}'...")
+                    gh.create_branch(repo_path, feature_branch, base_branch)
+                else:
+                    print(f"    ✅ Feature branch '{feature_branch}' already exists, checking out...")
+                    # Checkout the existing branch
+                    gh._run_command(["git", "checkout", feature_branch], cwd=repo_path)
+                
+                print(f"    ✅ Setup complete for {fork_url}")
+                results.append({"repo": fork_url, "success": True})
+                
+            except Exception as e:
+                print(f"    ❌ Error processing {fork_url}: {e}")
+                results.append({"repo": fork_url, "success": False, "error": str(e)})
+        
+        # Summary
+        successful = sum(1 for r in results if r["success"])
+        failed = len(results) - successful
+        
+        print(f"\n📊 Summary:")
+        print(f"  📂 Processed: {processed}")
+        print(f"  ⏭️  Skipped: {skipped}")
+        print(f"  ✅ Successful: {successful}")
+        print(f"  ❌ Failed: {failed}")
+        
+        if failed > 0:
+            print("\n❌ Failed repositories:")
+            for r in results:
+                if not r["success"]:
+                    print(f"  • {r['repo']}: {r.get('error', 'Unknown error')}")
+        
+        return 0 if failed == 0 else 1
+        
+    except Exception as e:
+        print(f"❌ Error in clone-forks operation: {e}")
+        return 1
+
+
 def cmd_show_config(args):
     """Handle show-config subcommand"""
     try:
@@ -855,6 +978,8 @@ Examples:
   %(prog)s fork-repo opendatahub-io/odh-dashboard --clone
   %(prog)s fork-all --clone
   %(prog)s clone-repo opendatahub-io/odh-dashboard
+  %(prog)s clone-forks --dry-run
+  %(prog)s clone-forks --skip-existing
 
 Note: This tool can be run from anywhere within the project directory tree.
       It will automatically find config.yaml and .github_token files in the project root.
@@ -918,6 +1043,22 @@ For build and deployment operations, use the Ansible-based task system:
         "repository", help="Repository to clone (e.g., opendatahub-io/odh-dashboard)"
     )
     clone_repo_parser.set_defaults(func=cmd_clone_repo)
+
+    # clone-forks subcommand
+    clone_forks_parser = subparsers.add_parser(
+        "clone-forks", help="Clone all fork repositories from manifest dependencies"
+    )
+    clone_forks_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without making changes",
+    )
+    clone_forks_parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip repositories that already have local checkouts",
+    )
+    clone_forks_parser.set_defaults(func=cmd_clone_forks)
 
     # fork-all subcommand
     fork_all_parser = subparsers.add_parser(

@@ -290,7 +290,7 @@ class GitHubWrapper:
 
     def clone_repository(
         self, repo_url: str, directory_name: Optional[str] = None
-    ) -> Path:
+    ) -> Dict[str, Any]:
         """
         Clone a repository to the src directory using SSH origin
 
@@ -299,7 +299,7 @@ class GitHubWrapper:
             directory_name: Custom directory name (defaults to repo name)
 
         Returns:
-            Path: Path to cloned repository
+            Dict: Dictionary with 'cloned' (bool) and 'local_path' (str) keys
         """
         self.logger.info(f"Cloning repository: {repo_url}")
 
@@ -315,6 +315,14 @@ class GitHubWrapper:
 
         clone_path = self.src_dir / directory_name
 
+        # Check if repository already exists
+        if clone_path.exists() and (clone_path / ".git").exists():
+            self.logger.info(f"Repository already exists at: {clone_path}")
+            return {
+                "cloned": False,
+                "local_path": str(clone_path)
+            }
+
         # Convert to SSH URL for origin
         ssh_url = f"git@github.com:{repo_path}.git"
 
@@ -323,7 +331,10 @@ class GitHubWrapper:
         self._run_command(clone_command, cwd=self.src_dir)
 
         self.logger.info(f"Repository cloned to: {clone_path}")
-        return clone_path
+        return {
+            "cloned": True,
+            "local_path": str(clone_path)
+        }
 
     def create_branch(
         self, repo_path: Path, branch_name: str, base_branch: str = "main"
@@ -778,7 +789,8 @@ class GitHubWrapper:
                         time.sleep(3)
 
                     fork_repo = f"{fork_org}/{repo_name}"
-                    clone_path = self.clone_repository(fork_repo, repo_name)
+                    clone_result = self.clone_repository(fork_repo, repo_name)
+                    clone_path = Path(clone_result["local_path"])
 
                     # Set up upstream remote
                     upstream_url = f"https://github.com/{original_repo}"
