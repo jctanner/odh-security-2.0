@@ -240,8 +240,8 @@ def cmd_clone_forks(args):
                 fork_url = f"{fork_org}/{repo_name}"
                 local_path = gh.src_dir / repo_name
                 status = "exists" if local_path.exists() else "would clone"
-                base_branch = gh.get_base_branch()  # Use default base branch for additional repos
-                print(f"    • {fork_url} (base: {base_branch}) - {status}")
+                # For additional repos, default branch will be detected at runtime
+                print(f"    • {fork_url} (base: auto-detect) - {status}")
             
             return 0
         
@@ -316,7 +316,6 @@ def cmd_clone_forks(args):
                 repo_name = repo_url.split("/")[-1]
                 fork_url = f"{fork_org}/{repo_name}"
                 local_path = gh.src_dir / repo_name
-                base_branch = gh.get_base_branch()  # Use default base branch for additional repos
                 
                 # Skip if local checkout exists and --skip-existing is set
                 if local_path.exists() and args.skip_existing:
@@ -343,13 +342,15 @@ def cmd_clone_forks(args):
                     upstream_url = f"https://github.com/{repo_url}"
                     gh.setup_upstream(repo_path, upstream_url)
                     
-                    # Step 3c: Create or checkout feature branch
+                    # Step 3c: Detect default branch and create/checkout feature branch
                     print(f"  🔄 Setting up feature branch...")
                     feature_branch = gh.get_branch_name()
+                    default_branch = gh.get_default_branch(repo_path)
+                    print(f"    📋 Detected default branch: {default_branch}")
                     
                     if not gh.branch_exists(repo_path, feature_branch):
-                        print(f"    🆕 Creating feature branch '{feature_branch}'...")
-                        gh.create_branch(repo_path, feature_branch, base_branch)
+                        print(f"    🆕 Creating feature branch '{feature_branch}' from '{default_branch}'...")
+                        gh.create_branch(repo_path, feature_branch, default_branch)
                     else:
                         print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
                         # Fetch latest from origin and checkout with tracking

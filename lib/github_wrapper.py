@@ -1039,3 +1039,80 @@ class GitHubWrapper:
             )
 
         return env_config
+
+    def get_default_branch(self, repo_path: Path) -> str:
+        """
+        Get the default branch name for a repository
+        
+        Args:
+            repo_path: Path to local repository
+            
+        Returns:
+            str: Name of the default branch (e.g., 'main', 'master', etc.)
+        """
+        try:
+            # Try to get the default branch from the remote HEAD reference
+            result = self._run_command(
+                ["git", "symbolic-ref", "refs/remotes/origin/HEAD"], 
+                cwd=repo_path
+            )
+            # Output will be like "refs/remotes/origin/main" or "refs/remotes/origin/master"
+            default_branch = result.stdout.strip().split('/')[-1]
+            self.logger.info(f"Detected default branch: {default_branch}")
+            return default_branch
+            
+        except subprocess.CalledProcessError:
+            # Remote HEAD might not be set, try to set it automatically
+            try:
+                self.logger.info("Remote HEAD not set, attempting to set it automatically...")
+                self._run_command(
+                    ["git", "remote", "set-head", "origin", "--auto"], 
+                    cwd=repo_path
+                )
+                # Now try again to get the default branch
+                result = self._run_command(
+                    ["git", "symbolic-ref", "refs/remotes/origin/HEAD"], 
+                    cwd=repo_path
+                )
+                default_branch = result.stdout.strip().split('/')[-1]
+                self.logger.info(f"Detected default branch after setting HEAD: {default_branch}")
+                return default_branch
+                
+            except subprocess.CalledProcessError:
+                # If that fails, try to get it from git remote show
+                try:
+                    result = self._run_command(
+                        ["git", "remote", "show", "origin"], 
+                        cwd=repo_path
+                    )
+                    # Look for "HEAD branch: <branch_name>"
+                    for line in result.stdout.split('\n'):
+                        if 'HEAD branch:' in line:
+                            default_branch = line.split(':')[1].strip()
+                            self.logger.info(f"Detected default branch from remote show: {default_branch}")
+                            return default_branch
+                            
+                except subprocess.CalledProcessError:
+                    pass
+                
+                # If all else fails, try common default branches
+                for branch in ['main', 'master', 'develop']:
+                    try:
+                        self._run_command(
+                            ["git", "show-ref", "--verify", f"refs/remotes/origin/{branch}"], 
+                            cwd=repo_path
+                        )
+                        self.logger.info(f"Found default branch by fallback: {branch}")
+                        return branch
+                    except subprocess.CalledProcessError:
+                        continue
+                
+                # Last resort - use configured base branch  
+                fallback = self.get_base_branch()
+                self.logger.warning(f"Could not detect default branch, using configured fallback: {fallback}")
+                return fallback
+            
+        except Exception as e:
+            fallback = self.get_base_branch()
+            self.logger.error(f"Error detecting default branch: {e}, using fallback: {fallback}")
+            return fallback
