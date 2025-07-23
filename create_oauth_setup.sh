@@ -139,7 +139,7 @@ spec:
         - --cookie-secret-file=/etc/oauth/config/cookie_secret
         - --cookie-expire=23h0m0s
         - --pass-access-token
-        - --skip-auth-regex=^/api/health|^/api/status
+        #- --skip-auth-regex=^/api/health|^/api/status
         - --skip-provider-button
         - --email-domain=*
         # oauth-proxy bug: --ssl-insecure-skip-verify doesn't work for upstream connections

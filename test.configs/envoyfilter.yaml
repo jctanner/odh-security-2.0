@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: preserve-x-forwarded-token
+  namespace: openshift-ingress
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: odh-gateway
+  configPatches:
+  - applyTo: HTTP_ROUTE
+    match:
+      context: GATEWAY
+    patch:
+      operation: MERGE
+      value:
+        request_headers_to_add:
+        - header:
+            key: x-forwarded-token
+            value: "%REQ(x-forwarded-token)%"
+          append: false
+
