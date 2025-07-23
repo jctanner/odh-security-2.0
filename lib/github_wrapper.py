@@ -486,9 +486,9 @@ class GitHubWrapper:
         """Get the base branch name from configuration"""
         return self.config.get("github", {}).get("base_branch", "main")
 
-    def get_target_repositories(self) -> List[str]:
-        """Get the list of target repositories from configuration"""
-        return self.config.get("target_repositories", [])
+    def get_additional_repositories(self) -> List[str]:
+        """Get the list of additional repositories from configuration"""
+        return self.config.get("additional_repositories", [])
 
     def should_auto_create_branch(self) -> bool:
         """Check if branches should be automatically created after forking"""

@@ -17,15 +17,17 @@ Key Features:
 
 Core Workflows:
 - Repository setup: fork, clone, rebase, branch creation
-- Batch operations across multiple target repositories
+- Batch operations across manifest dependencies and additional repositories
 - Configuration-driven development environment management
 - YAML-based workflow execution for build/deploy operations
 
 Usage Context:
 This tool is designed for the odh-security-2.0 project where multiple
 opendatahub-io repositories need to be forked, cloned, and patched for
-Gateway API migration. All repository checkouts are managed in the src/
-directory structure to keep the main project clean.
+Gateway API migration. Repository dependencies are discovered from
+get_all_manifests.sh, with additional repositories configurable in config.yaml.
+All repository checkouts are managed in the src/ directory structure to keep
+the main project clean.
 
 Security:
 - GitHub token is read from .github_token file (not committed to git)
@@ -217,22 +219,40 @@ def cmd_clone_forks(args):
             print(f"❌ Error parsing manifest repositories: {e}")
             return 1
         
+        # Get additional repositories from config
+        additional_repos = gh.get_additional_repositories()
+        print(f"📋 Found {len(additional_repos)} additional repositories in configuration")
+        
         if args.dry_run:
-            print("\n🔍 DRY RUN - Would clone the following fork repositories:")
+            print("\n🔍 DRY RUN - Would clone the following repositories:")
             fork_org = gh.get_fork_org()
+            
+            print("  📦 Manifest Dependencies:")
             for repo_name, base_branch in manifest_repos.items():
                 fork_url = f"{fork_org}/{repo_name}"
                 local_path = gh.src_dir / repo_name
                 status = "exists" if local_path.exists() else "would clone"
-                print(f"  • {fork_url} (base: {base_branch}) - {status}")
+                print(f"    • {fork_url} (base: {base_branch}) - {status}")
+            
+            print("\n  ➕ Additional Repositories:")
+            for repo_url in additional_repos:
+                repo_name = repo_url.split("/")[-1]
+                fork_url = f"{fork_org}/{repo_name}"
+                local_path = gh.src_dir / repo_name
+                status = "exists" if local_path.exists() else "would clone"
+                base_branch = gh.get_base_branch()  # Use default base branch for additional repos
+                print(f"    • {fork_url} (base: {base_branch}) - {status}")
+            
             return 0
         
-        # Step 3: Clone all fork repositories and set them up
+        # Step 3: Clone all repositories and set them up
         fork_org = gh.get_fork_org()
         results = []
         processed = 0
         skipped = 0
         
+        # Process manifest repositories
+        print(f"\n📦 Processing manifest dependencies ({len(manifest_repos)} repositories):")
         for repo_name, base_branch in manifest_repos.items():
             # Skip opendatahub-operator since we already handled it in Step 1
             if repo_name == "opendatahub-operator":
@@ -289,6 +309,60 @@ def cmd_clone_forks(args):
                 print(f"    ❌ Error processing {fork_url}: {e}")
                 results.append({"repo": fork_url, "success": False, "error": str(e)})
         
+        # Process additional repositories
+        if additional_repos:
+            print(f"\n➕ Processing additional repositories ({len(additional_repos)} repositories):")
+            for repo_url in additional_repos:
+                repo_name = repo_url.split("/")[-1]
+                fork_url = f"{fork_org}/{repo_name}"
+                local_path = gh.src_dir / repo_name
+                base_branch = gh.get_base_branch()  # Use default base branch for additional repos
+                
+                # Skip if local checkout exists and --skip-existing is set
+                if local_path.exists() and args.skip_existing:
+                    print(f"⏭️  Skipping {fork_url} (local checkout exists)")
+                    skipped += 1
+                    continue
+                
+                try:
+                    print(f"\n📂 Processing {fork_url}...")
+                    processed += 1
+                    
+                    # Step 3a: Clone fork
+                    print(f"  🔄 Cloning fork...")
+                    result = gh.clone_repository(fork_url)
+                    
+                    if result["cloned"]:
+                        print(f"    ✅ Repository cloned to: {result['local_path']}")
+                    else:
+                        print(f"    ℹ️  Repository already exists at: {result['local_path']}")
+                    
+                    # Step 3b: Setup upstream and rebase
+                    print(f"  🔄 Setting up upstream and rebasing...")
+                    repo_path = Path(result["local_path"])
+                    upstream_url = f"https://github.com/{repo_url}"
+                    gh.setup_upstream(repo_path, upstream_url)
+                    
+                    # Step 3c: Create or checkout feature branch
+                    print(f"  🔄 Setting up feature branch...")
+                    feature_branch = gh.get_branch_name()
+                    
+                    if not gh.branch_exists(repo_path, feature_branch):
+                        print(f"    🆕 Creating feature branch '{feature_branch}'...")
+                        gh.create_branch(repo_path, feature_branch, base_branch)
+                    else:
+                        print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
+                        # Fetch latest from origin and checkout with tracking
+                        gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
+                        gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                    
+                    print(f"    ✅ Setup complete for {fork_url}")
+                    results.append({"repo": fork_url, "success": True})
+                    
+                except Exception as e:
+                    print(f"    ❌ Error processing {fork_url}: {e}")
+                    results.append({"repo": fork_url, "success": False, "error": str(e)})
+
         # Summary
         successful = sum(1 for r in results if r["success"])
         failed = len(results) - successful
@@ -327,18 +401,19 @@ def cmd_show_config(args):
         print("🔗 GitHub Settings:")
         github_config = config.get("github", {})
         print(f"  Fork Organization: {github_config.get('fork_org', 'N/A')}")
-        print(f"  Feature Branch: {github_config.get('feature_branch', 'N/A')}")
+        print(f"  Branch Name: {github_config.get('branch_name', 'N/A')}")
+        print(f"  Base Branch: {github_config.get('base_branch', 'N/A')}")
         print()
 
-        print("🎯 Target Repositories:")
-        repos = config.get("repositories", {})
-        for category, repo_list in repos.items():
-            print(f"  {category}:")
-            for repo in repo_list:
-                if isinstance(repo, dict):
-                    print(f"    • {repo.get('name', 'N/A')}")
-                else:
-                    print(f"    • {repo}")
+        print("📦 Repository Sources:")
+        print("  Manifest Dependencies: Parsed from get_all_manifests.sh")
+        additional_repos = config.get("additional_repositories", [])
+        if additional_repos:
+            print("  ➕ Additional Repositories:")
+            for repo in additional_repos:
+                print(f"    • {repo} → {github_config.get('fork_org', 'N/A')}/{repo.split('/')[-1]}")
+        else:
+            print("  ➕ Additional Repositories: None configured")
         print()
 
         print("🐳 Registry Settings:")
@@ -371,58 +446,46 @@ def cmd_show_config(args):
 
 
 def cmd_fork_all(args):
-    """Handle fork-all subcommand"""
+    """Handle fork-all subcommand - forks additional repositories from configuration"""
     try:
         gh = GitHubWrapper()
 
-        print("🔄 Forking all target repositories...")
+        print("🔄 Forking additional repositories...")
+        additional_repos = gh.get_additional_repositories()
+        
+        if not additional_repos:
+            print("ℹ️  No additional repositories configured in config.yaml")
+            print("💡 Note: Manifest dependencies are handled automatically by clone-forks")
+            return 0
+        
         results = []
+        fork_org = gh.get_fork_org()
 
-        # Get all repository names from config
-        repos = config.get("repositories", {})
+        print(f"\n📂 Processing {len(additional_repos)} additional repositories:")
 
-        for category, repo_list in repos.items():
-            print(f"\n📂 Processing {category} repositories:")
+        for repo_url in additional_repos:
+            try:
+                print(f"  🔄 Forking {repo_url}...")
+                fork_result = gh.fork_repository(repo_url)
 
-            for repo in repo_list:
-                if isinstance(repo, dict):
-                    repo_name = repo.get("name", "")
-                else:
-                    repo_name = repo
+                # Since fork_repository returns RepoInfo, just show that fork is available
+                print(f"    ✅ Fork available: {fork_result.fork_owner}/{fork_result.name}")
 
-                if not repo_name:
-                    continue
-
-                try:
-                    print(f"  🔄 Forking {repo_name}...")
-                    fork_result = gh.fork_repository(repo_name)
-
-                    if fork_result["created"]:
-                        print(f"    ✅ Fork created: {fork_result['fork_url']}")
+                # Clone if requested
+                if args.clone:
+                    print(f"  🔄 Cloning fork...")
+                    clone_result = gh.clone_repository(f"{fork_result.fork_owner}/{fork_result.name}")
+                    
+                    if clone_result["cloned"]:
+                        print(f"    ✅ Repository cloned to: {clone_result['local_path']}")
                     else:
-                        print(f"    ℹ️  Fork already exists: {fork_result['fork_url']}")
+                        print(f"    ℹ️  Repository already exists at: {clone_result['local_path']}")
 
-                    # Clone if requested
-                    if args.clone:
-                        print(f"    🔄 Cloning fork...")
-                        clone_result = gh.clone_repository(repo_name)
+                results.append({"repo": repo_url, "success": True})
 
-                        if clone_result["cloned"]:
-                            print(
-                                f"    ✅ Repository cloned to: {clone_result['local_path']}"
-                            )
-                        else:
-                            print(
-                                f"    ℹ️  Repository already exists at: {clone_result['local_path']}"
-                            )
-
-                    results.append({"repo": repo_name, "success": True})
-
-                except Exception as e:
-                    print(f"    ❌ Error processing {repo_name}: {e}")
-                    results.append(
-                        {"repo": repo_name, "success": False, "error": str(e)}
-                    )
+            except Exception as e:
+                print(f"    ❌ Error processing {repo_url}: {e}")
+                results.append({"repo": repo_url, "success": False, "error": str(e)})
 
         # Summary
         successful = sum(1 for r in results if r["success"])
@@ -437,6 +500,8 @@ def cmd_fork_all(args):
             for r in results:
                 if not r["success"]:
                     print(f"  • {r['repo']}: {r.get('error', 'Unknown error')}")
+        
+        print("\n💡 Tip: Use 'clone-forks' for complete setup with manifest dependencies")
 
         return 0 if failed == 0 else 1
 
@@ -1103,7 +1168,7 @@ For build and deployment operations, use the Ansible-based task system:
 
     # fork-all subcommand
     fork_all_parser = subparsers.add_parser(
-        "fork-all", help="Fork all target repositories from configuration"
+        "fork-all", help="Fork additional repositories from configuration"
     )
     fork_all_parser.add_argument(
         "--clone", action="store_true", help="Clone repositories after forking"

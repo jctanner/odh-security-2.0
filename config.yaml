@@ -12,16 +12,11 @@ github:
   # Base branch to create migration branches from (usually main or master)
   base_branch: "main"
 
-# Target repositories for migration
-# These are the opendatahub-io repositories that need Gateway API migration
-target_repositories:
-  - "opendatahub-io/opendatahub-operator"
-  - "opendatahub-io/odh-dashboard"
-  - "opendatahub-io/odh-model-controller"
-  - "opendatahub-io/kubeflow"
-  - "opendatahub-io/notebook-controller"
-  - "opendatahub-io/notebooks"
-  - "opendatahub-io/odh-manifest"
+# Additional repositories for migration work
+# These are repositories outside the manifest dependencies that you want to work with
+# Format: "original_org/repo_name" - will be forked to your fork_org
+additional_repositories:
+  - "openshift/oauth-proxy"
 
 # Container Registry Configuration
 registry:
