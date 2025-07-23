@@ -188,9 +188,30 @@ def cmd_clone_forks(args):
                     gh.create_branch(repo_path, feature_branch, base_branch)
                 else:
                     print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
-                    # Fetch latest from origin and checkout with tracking
+                    # Fetch latest from origin
                     gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
-                    gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                    
+                    # Check if we're already on the target branch
+                    try:
+                        current_branch_result = gh._run_command(["git", "branch", "--show-current"], cwd=repo_path)
+                        current_branch = current_branch_result.stdout.strip()
+                        
+                        if current_branch == feature_branch:
+                            print(f"    📍 Already on '{feature_branch}', pulling latest changes...")
+                            gh._run_command(["git", "pull", "origin", feature_branch], cwd=repo_path)
+                        else:
+                            print(f"    🔄 Switching to '{feature_branch}' branch...")
+                            # Just checkout to existing local branch (no --track needed)
+                            gh._run_command(["git", "checkout", feature_branch], cwd=repo_path)
+                            gh._run_command(["git", "pull", "origin", feature_branch], cwd=repo_path)
+                    except Exception as checkout_error:
+                        print(f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}")
+                        # Fallback: try to create tracking branch if local doesn't exist
+                        try:
+                            gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                        except Exception as track_error:
+                            print(f"    ❌ Failed to checkout/track branch: {track_error}")
+                            raise
                 
                 print(f"    ✅ Operator setup complete!")
                 
@@ -206,7 +227,28 @@ def cmd_clone_forks(args):
                 if gh.branch_exists(operator_local_path, feature_branch):
                     print(f"    🔄 Updating feature branch '{feature_branch}' from origin...")
                     gh._run_command(["git", "fetch", "origin"], cwd=operator_local_path)
-                    gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=operator_local_path)
+                    
+                    # Check if we're already on the target branch
+                    try:
+                        current_branch_result = gh._run_command(["git", "branch", "--show-current"], cwd=operator_local_path)
+                        current_branch = current_branch_result.stdout.strip()
+                        
+                        if current_branch == feature_branch:
+                            print(f"    📍 Already on '{feature_branch}', pulling latest changes...")
+                            gh._run_command(["git", "pull", "origin", feature_branch], cwd=operator_local_path)
+                        else:
+                            print(f"    🔄 Switching to '{feature_branch}' branch...")
+                            # Just checkout to existing local branch (no --track needed)
+                            gh._run_command(["git", "checkout", feature_branch], cwd=operator_local_path)
+                            gh._run_command(["git", "pull", "origin", feature_branch], cwd=operator_local_path)
+                    except Exception as checkout_error:
+                        print(f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}")
+                        # Fallback: try to create tracking branch if local doesn't exist
+                        try:
+                            gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=operator_local_path)
+                        except Exception as track_error:
+                            print(f"    ❌ Failed to checkout/track branch: {track_error}")
+                            raise
             except Exception as e:
                 print(f"    ⚠️  Could not checkout feature branch: {e}")
         
@@ -298,9 +340,30 @@ def cmd_clone_forks(args):
                     gh.create_branch(repo_path, feature_branch, base_branch)
                 else:
                     print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
-                    # Fetch latest from origin and checkout with tracking
+                    # Fetch latest from origin
                     gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
-                    gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                    
+                    # Check if we're already on the target branch
+                    try:
+                        current_branch_result = gh._run_command(["git", "branch", "--show-current"], cwd=repo_path)
+                        current_branch = current_branch_result.stdout.strip()
+                        
+                        if current_branch == feature_branch:
+                            print(f"    📍 Already on '{feature_branch}', pulling latest changes...")
+                            gh._run_command(["git", "pull", "origin", feature_branch], cwd=repo_path)
+                        else:
+                            print(f"    🔄 Switching to '{feature_branch}' branch...")
+                            # Just checkout to existing local branch (no --track needed)
+                            gh._run_command(["git", "checkout", feature_branch], cwd=repo_path)
+                            gh._run_command(["git", "pull", "origin", feature_branch], cwd=repo_path)
+                    except Exception as checkout_error:
+                        print(f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}")
+                        # Fallback: try to create tracking branch if local doesn't exist
+                        try:
+                            gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                        except Exception as track_error:
+                            print(f"    ❌ Failed to checkout/track branch: {track_error}")
+                            raise
                 
                 print(f"    ✅ Setup complete for {fork_url}")
                 results.append({"repo": fork_url, "success": True})
@@ -353,9 +416,30 @@ def cmd_clone_forks(args):
                         gh.create_branch(repo_path, feature_branch, default_branch)
                     else:
                         print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
-                        # Fetch latest from origin and checkout with tracking
+                        # Fetch latest from origin
                         gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
-                        gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                        
+                        # Check if we're already on the target branch
+                        try:
+                            current_branch_result = gh._run_command(["git", "branch", "--show-current"], cwd=repo_path)
+                            current_branch = current_branch_result.stdout.strip()
+                            
+                            if current_branch == feature_branch:
+                                print(f"    📍 Already on '{feature_branch}', pulling latest changes...")
+                                gh._run_command(["git", "pull", "origin", feature_branch], cwd=repo_path)
+                            else:
+                                print(f"    🔄 Switching to '{feature_branch}' branch...")
+                                # Just checkout to existing local branch (no --track needed)
+                                gh._run_command(["git", "checkout", feature_branch], cwd=repo_path)
+                                gh._run_command(["git", "pull", "origin", feature_branch], cwd=repo_path)
+                        except Exception as checkout_error:
+                            print(f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}")
+                            # Fallback: try to create tracking branch if local doesn't exist
+                            try:
+                                gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                            except Exception as track_error:
+                                print(f"    ❌ Failed to checkout/track branch: {track_error}")
+                                raise
                     
                     print(f"    ✅ Setup complete for {fork_url}")
                     results.append({"repo": fork_url, "success": True})
