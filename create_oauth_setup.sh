@@ -120,7 +120,8 @@ spec:
     spec:
       containers:
       - name: oauth-proxy
-        image: registry.redhat.io/openshift4/ose-oauth-proxy:latest
+        #image: registry.redhat.io/openshift4/ose-oauth-proxy:latest
+        image: registry.tannerjc.net/oauth-proxy:latest
         args:
         - --https-address=:8443
         - --provider=openshift
@@ -143,6 +144,7 @@ spec:
         # oauth-proxy bug: --ssl-insecure-skip-verify doesn't work for upstream connections
         # Workaround: Connect to service IP directly to bypass route certificate issues
         - --request-logging
+        - --upstream-insecure-skip-verify
         ports:
         - containerPort: 8443
           name: https
