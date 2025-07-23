@@ -1,9 +1,8 @@
-# Deploy OpenDataHub Tasks
-# Ansible task file for deploying the full OpenDataHub stack to Kubernetes cluster
-
+---
+# OpenDataHub deployment task - deploys operator, DSCI, and DSC
 - name: "Create namespace"
   live_shell:
-    cmd: "kubectl get namespace {{ namespace }} {% raw %}||{% endraw %} kubectl create namespace {{ namespace }}"
+    cmd: "kubectl get namespace {{ application_namespace }} {% raw %}||{% endraw %} kubectl create namespace {{ application_namespace }}"
   register: create_namespace_result
 
 - name: "Create operator namespace"
@@ -76,7 +75,7 @@
 
 - name: "Deploy DSCI"
   live_shell:
-    cmd: "kubectl apply -f /tmp/dsci-config.yaml -n {{ namespace }}"
+    cmd: "kubectl apply -f /tmp/dsci-config.yaml -n {{ application_namespace }}"
   register: deploy_dsci_result
 
 # WORKAROUND!!!
@@ -88,7 +87,7 @@
 
 - name: "Wait for DSCI to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Available dscinitializations.dscinitialization.opendatahub.io/{{ dsci_config.name }} -n {{ namespace }} --timeout={{ wait_timeout }}s"
+    cmd: "kubectl wait --for=condition=Available dscinitializations.dscinitialization.opendatahub.io/{{ dsci_config.name }} -n {{ application_namespace }} --timeout={{ wait_timeout }}s"
   register: wait_dsci_result
 
 - name: "Create DSC configuration file"
@@ -111,12 +110,12 @@
 
 - name: "Deploy DSC"
   live_shell:
-    cmd: "kubectl apply -f /tmp/dsc-config.yaml -n {{ namespace }}"
+    cmd: "kubectl apply -f /tmp/dsc-config.yaml -n {{ application_namespace }}"
   register: deploy_dsc_result
 
 - name: "Wait for DSC to be ready"
   live_shell:
-    cmd: "kubectl wait --for=condition=Ready datascienceclusters.datasciencecluster.opendatahub.io/{{ dsc_config.name }} -n {{ namespace }} --timeout={{ wait_timeout }}s"
+    cmd: "kubectl wait --for=condition=Ready datascienceclusters.datasciencecluster.opendatahub.io/{{ dsc_config.name }} -n {{ application_namespace }} --timeout={{ wait_timeout }}s"
   register: wait_dsc_result
 
 - name: "Check operator status"
@@ -126,7 +125,7 @@
 
 - name: "Check DSC status"
   live_shell:
-    cmd: "kubectl get datascienceclusters.datasciencecluster.opendatahub.io -n {{ namespace }}"
+    cmd: "kubectl get datascienceclusters.datasciencecluster.opendatahub.io -n {{ application_namespace }}"
   register: final_dsc_status
 
 - name: "Clean up temporary files"
@@ -143,7 +142,7 @@
     msg:
       - "Deployment completed successfully!"
       - "Operator Namespace: opendatahub-operator-system"
-      - "Target Namespace: {{ namespace }}"
+      - "Target Namespace: {{ application_namespace }}"
       - "DSCI Name: {{ dsci_config.name }}"
       - "DSC Name: {{ dsc_config.name }}"
       - "Service Mesh: {{ dsci_config.spec.serviceMesh.managementState | default('Not configured') }}"

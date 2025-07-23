@@ -100,16 +100,14 @@ class AnsibleEngine:
                 }
             )
 
-        # Add deployment defaults
+        # Deployment variables
         deployment_config = self.config.get("deployment", {})
-        variables.update(
-            {
-                "namespace": deployment_config.get("namespace", "opendatahub"),
-                "wait_timeout": deployment_config.get("wait_timeout", 300),
-                "dsci_config": deployment_config.get("dsci", {}),
-                "dsc_config": deployment_config.get("dsc", {}),
-            }
-        )
+        variables.update({
+            "application_namespace": deployment_config.get("application_namespace", "opendatahub"),
+            "wait_timeout": deployment_config.get("wait_timeout", 300),
+            "dsci_config": deployment_config.get("dsci", {}),
+            "dsc_config": deployment_config.get("dsc", {}),
+        })
 
         # Add runtime variable overrides
         if runtime_vars:

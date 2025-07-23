@@ -70,7 +70,7 @@ migration:
 # Settings for OpenDataHub deployment including DSCI and DSC resources
 deployment:
   # Default namespace for OpenDataHub components
-  namespace: "opendatahub"
+  application_namespace: "opendatahub"
   
   # Timeout for waiting on resources to be ready (in seconds)
   wait_timeout: 300
