@@ -8,6 +8,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### add your github token to a secrets file
+```
+echo $TOKEN > .github_token
+```
+
 ### create all the clones
 ```
 ./tool.py clone-forks
