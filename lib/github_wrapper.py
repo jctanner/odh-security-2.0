@@ -357,8 +357,8 @@ class GitHubWrapper:
         )
         self._run_command(["git", "pull", "origin", base_branch], cwd=repo_path)
 
-        # Create and checkout new branch
-        self._run_command(["git", "checkout", "-b", branch_name], cwd=repo_path)
+        # Create and checkout new branch (use -B to allow recreating existing branch)
+        self._run_command(["git", "checkout", "-B", branch_name], cwd=repo_path)
 
         self.logger.info(f"Branch '{branch_name}' created successfully")
 
@@ -372,12 +372,30 @@ class GitHubWrapper:
         """
         self.logger.info(f"Setting up upstream remote: {upstream_url}")
 
-        # Add upstream remote
-        self._run_command(
-            ["git", "remote", "add", "upstream", upstream_url], cwd=repo_path
-        )
+        # Check if upstream remote already exists
+        try:
+            result = self._run_command(["git", "remote"], cwd=repo_path)
+            existing_remotes = result.stdout.strip().split('\n')
+            
+            if "upstream" not in existing_remotes:
+                # Add upstream remote
+                self._run_command(
+                    ["git", "remote", "add", "upstream", upstream_url], cwd=repo_path
+                )
+                self.logger.info("Upstream remote added")
+            else:
+                self.logger.info("Upstream remote already exists")
+                # Update the upstream URL in case it changed
+                self._run_command(
+                    ["git", "remote", "set-url", "upstream", upstream_url], cwd=repo_path
+                )
+                self.logger.info("Upstream remote URL updated")
+        
+        except Exception as e:
+            self.logger.error(f"Failed to check/setup upstream remote: {e}")
+            raise
 
-        # Fetch upstream
+        # Fetch upstream (always do this to get latest changes)
         self._run_command(["git", "fetch", "upstream"], cwd=repo_path)
 
         self.logger.info("Upstream remote configured successfully")
@@ -612,23 +630,33 @@ class GitHubWrapper:
 
     def branch_exists(self, repo_path: Path, branch_name: str) -> bool:
         """
-        Check if a branch exists in the repository
+        Check if a branch exists locally or remotely in the repository
 
         Args:
             repo_path: Path to local repository
             branch_name: Name of branch to check
 
         Returns:
-            bool: True if branch exists, False otherwise
+            bool: True if branch exists locally or on origin, False otherwise
         """
         try:
+            # Check local branches first
             result = self._run_command(
                 ["git", "branch", "--list", branch_name], cwd=repo_path
             )
-            exists = bool(result.stdout.strip())
+            local_exists = bool(result.stdout.strip())
+
+            # Check remote branches
+            result = self._run_command(
+                ["git", "branch", "-r", "--list", f"origin/{branch_name}"], cwd=repo_path
+            )
+            remote_exists = bool(result.stdout.strip())
+
+            exists = local_exists or remote_exists
 
             self.logger.info(
-                f"Branch '{branch_name}' {'exists' if exists else 'does not exist'} in {repo_path}"
+                f"Branch '{branch_name}' {'exists' if exists else 'does not exist'} in {repo_path} "
+                f"(local: {local_exists}, remote: {remote_exists})"
             )
             return exists
 

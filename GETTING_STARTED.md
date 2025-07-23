@@ -6,4 +6,8 @@ virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+# create all the clones
 ./tool.py clone-forks
+
+# copy manifests into the operator repo
+./tool.py workflow --name=manifests --exec

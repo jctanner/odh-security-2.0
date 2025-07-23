@@ -1,7 +1,7 @@
 # Build OpenDataHub Operator Tasks
 # Ansible task file for building the OpenDataHub operator image from local checkouts
 
-- name: "Build operator image"
+- name: "Assemble local manifests"
   live_shell:
     cmd: "make get-manifests-local"
     chdir: "{{ local_checkouts_dir }}/opendatahub-operator"

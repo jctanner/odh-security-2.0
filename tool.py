@@ -158,21 +158,55 @@ def cmd_clone_forks(args):
         # Step 1: Ensure opendatahub-operator is available for dependency parsing
         operator_repo = "opendatahub-io/opendatahub-operator"
         operator_local_path = gh.src_dir / "opendatahub-operator"
+        fork_org = gh.get_fork_org()
+        operator_fork_url = f"{fork_org}/opendatahub-operator"
         
         if not operator_local_path.exists():
-            print(f"📋 First cloning {operator_repo} (required for manifest parsing)...")
+            print(f"📋 First setting up {operator_repo} (required for manifest parsing)...")
             try:
-                result = gh.clone_repository(operator_repo)
+                print(f"  🔄 Cloning fork...")
+                result = gh.clone_repository(operator_fork_url)
                 if result["cloned"]:
-                    print(f"✅ Operator cloned to: {result['local_path']}")
+                    print(f"    ✅ Repository cloned to: {result['local_path']}")
                 else:
-                    print(f"ℹ️  Operator already exists at: {result['local_path']}")
+                    print(f"    ℹ️  Repository already exists at: {result['local_path']}")
+                
+                # Setup upstream and feature branch for operator too
+                print(f"  🔄 Setting up upstream and rebasing...")
+                repo_path = Path(result["local_path"])
+                upstream_url = f"https://github.com/{operator_repo}"
+                gh.setup_upstream(repo_path, upstream_url)
+                
+                print(f"  🔄 Setting up feature branch...")
+                feature_branch = gh.get_branch_name()
+                base_branch = "main"  # opendatahub-operator uses main branch
+                
+                if not gh.branch_exists(repo_path, feature_branch):
+                    print(f"    🆕 Creating feature branch '{feature_branch}'...")
+                    gh.create_branch(repo_path, feature_branch, base_branch)
+                else:
+                    print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
+                    # Fetch latest from origin and checkout with tracking
+                    gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
+                    gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
+                
+                print(f"    ✅ Operator setup complete!")
+                
             except Exception as e:
-                print(f"❌ Error cloning operator repository: {e}")
+                print(f"❌ Error setting up operator repository: {e}")
                 print("🔍 This repository is required to parse manifest dependencies")
                 return 1
         else:
             print(f"✅ Operator repository already available at: {operator_local_path}")
+            # Ensure we're on the feature branch if the repo already exists
+            try:
+                feature_branch = gh.get_branch_name()
+                if gh.branch_exists(operator_local_path, feature_branch):
+                    print(f"    🔄 Updating feature branch '{feature_branch}' from origin...")
+                    gh._run_command(["git", "fetch", "origin"], cwd=operator_local_path)
+                    gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=operator_local_path)
+            except Exception as e:
+                print(f"    ⚠️  Could not checkout feature branch: {e}")
         
         # Step 2: Parse manifest repositories from get_all_manifests.sh
         try:
@@ -200,6 +234,12 @@ def cmd_clone_forks(args):
         skipped = 0
         
         for repo_name, base_branch in manifest_repos.items():
+            # Skip opendatahub-operator since we already handled it in Step 1
+            if repo_name == "opendatahub-operator":
+                print(f"⏭️  Skipping {repo_name} (already processed in Step 1)")
+                skipped += 1
+                continue
+                
             fork_url = f"{fork_org}/{repo_name}"
             original_repo = f"opendatahub-io/{repo_name}"
             local_path = gh.src_dir / repo_name
@@ -237,9 +277,10 @@ def cmd_clone_forks(args):
                     print(f"    🆕 Creating feature branch '{feature_branch}'...")
                     gh.create_branch(repo_path, feature_branch, base_branch)
                 else:
-                    print(f"    ✅ Feature branch '{feature_branch}' already exists, checking out...")
-                    # Checkout the existing branch
-                    gh._run_command(["git", "checkout", feature_branch], cwd=repo_path)
+                    print(f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin...")
+                    # Fetch latest from origin and checkout with tracking
+                    gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
+                    gh._run_command(["git", "checkout", "--track", f"origin/{feature_branch}"], cwd=repo_path)
                 
                 print(f"    ✅ Setup complete for {fork_url}")
                 results.append({"repo": fork_url, "success": True})
