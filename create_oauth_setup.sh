@@ -12,7 +12,8 @@ NAMESPACE="openshift-ingress"
 OAUTH_CLIENT_NAME="odh-gateway-oauth-client"
 OAUTH_PROXY_NAME="odh-gateway-oauth-proxy"
 GATEWAY_SERVICE="odh-gateway-odh-gateway-class"
-HOSTNAME="demo.odh.apps-crc.testing"  # Different hostname to avoid circular reference
+#HOSTNAME="demo.odh.apps-crc.testing"  # Different hostname to avoid circular reference
+HOSTNAME="gateway.apps-crc.testing"  # Different hostname to avoid circular reference
 
 # Delete existing route if it exists
 echo "🗑️  Removing existing route..."
@@ -125,9 +126,9 @@ spec:
         args:
         - --https-address=:8443
         - --provider=openshift
-        #- --upstream=https://${GATEWAY_SERVICE}.${NAMESPACE}.svc.cluster.local:443
-        #- --upstream=https://${GATEWAY_SERVICE}.${NAMESPACE}.svc.cluster.local:443
-        - --upstream=https://odh-gateway.odh.apps-crc.testing/
+        - --upstream=https://${GATEWAY_SERVICE}.${NAMESPACE}.svc.cluster.local:443
+        #- --upstream=https://odh-gateway.odh.apps-crc.testing/
+        #- --upstream=https://gateway.apps-crc.testing/
         # Use service account CA which should include OpenShift route certificates
         - --upstream-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         - --tls-cert=/etc/tls/private/tls.crt
