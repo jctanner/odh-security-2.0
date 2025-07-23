@@ -11,3 +11,10 @@ pip install -r requirements.txt
 
 # copy manifests into the operator repo
 ./tool.py workflow --name=manifests --exec
+
+# do all the pre-deploy stuff
+./tool.py workflow --name=pre-deploy --exec
+
+# run the operator locally ...
+cd src/opendatahub-operator
+make run-nowebhook

@@ -1,14 +1,13 @@
-# Cleanup, Build, Push, and Deploy OpenDataHub Complete Pipeline
-# Ansible task file for the full development cycle with cleanup
+---
+# Complete cleanup and fresh deployment workflow
+# This combines cleanup.yml, build.yml, push.yml, pre-deploy.yml, and deploy.yml workflows
 
-- name: "Cleanup OpenDataHub from Cluster"
-  include_tasks: cleanup.yml
+- include_tasks: cleanup.yml
 
-- name: "Build OpenDataHub Operator"
-  include_tasks: build.yml
+- include_tasks: build.yml
 
-- name: "Push OpenDataHub Operator Image"
-  include_tasks: push.yml
+- include_tasks: push.yml
 
-- name: "Deploy OpenDataHub to Cluster"
-  include_tasks: deploy.yml 
+- include_tasks: pre-deploy.yml
+
+- include_tasks: deploy.yml 

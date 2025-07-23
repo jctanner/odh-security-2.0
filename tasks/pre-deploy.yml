@@ -1,0 +1,56 @@
+---
+# OpenDataHub pre-deployment setup tasks
+# Prepares namespaces, CRDs, and dependencies before operator deployment
+
+- name: "Create application namespace"
+  live_shell:
+    cmd: "kubectl get namespace {{ application_namespace }} {% raw %}||{% endraw %} kubectl create namespace {{ application_namespace }}"
+  register: create_namespace_result
+
+- name: "Create operator namespace"
+  live_shell:
+    cmd: "kubectl get namespace opendatahub-operator-system {% raw %}||{% endraw %} kubectl create namespace opendatahub-operator-system"
+  register: create_operator_namespace_result
+
+- name: "Install OpenDataHub CRDs"
+  live_shell:
+    cmd: "make install"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  register: install_crds_result
+
+- name: "Install Gateway service CRD"
+  live_shell:
+    cmd: "kubectl apply -f config/crd/bases/services.platform.opendatahub.io_gateways.yaml"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  register: install_gateway_crd_result
+
+- name: "Install cert-manager CRDs"
+  live_shell:
+    cmd: "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.crds.yaml"
+  register: install_certmanager_crds_result
+
+- name: "Install cert-manager"
+  live_shell:
+    cmd: "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml"
+  register: install_certmanager_result
+
+- name: "Wait for cert-manager to be ready"
+  live_shell:
+    cmd: "kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout={{ wait_timeout }}s"
+  register: wait_certmanager_result
+
+- name: "Pre-deployment setup complete"
+  debug:
+    msg:
+      - "✅ Pre-deployment setup completed successfully!"
+      - ""
+      - "🔧 Setup Summary:"
+      - "Application Namespace: {{ application_namespace }}"
+      - "Operator Namespace: opendatahub-operator-system"
+      - ""
+      - "📋 Dependencies Installed:"
+      - "✓ OpenDataHub CRDs"
+      - "✓ Gateway Service CRDs"
+      - "✓ cert-manager CRDs and Controller"
+      - ""
+      - "🚀 Ready for operator deployment!" 

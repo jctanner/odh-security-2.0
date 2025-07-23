@@ -1,11 +1,11 @@
-# Build, Push, and Deploy OpenDataHub Complete Pipeline
-# Ansible task file for the full CI/CD pipeline
+---
+# Combined workflow: Build operator image, push to registry, and deploy to cluster
+# This combines build.yml, push.yml, pre-deploy.yml, and deploy.yml workflows
 
-- name: "Build OpenDataHub Operator"
-  include_tasks: build.yml
+- include_tasks: build.yml
 
-- name: "Push OpenDataHub Operator Image"
-  include_tasks: push.yml
+- include_tasks: push.yml
 
-- name: "Deploy OpenDataHub to Cluster"
-  include_tasks: deploy.yml 
+- include_tasks: pre-deploy.yml
+
+- include_tasks: deploy.yml 

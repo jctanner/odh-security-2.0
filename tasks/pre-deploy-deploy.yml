@@ -1,0 +1,7 @@
+---
+# Combined pre-deployment setup and deployment workflow
+# This combines pre-deploy.yml and deploy.yml for deploying existing operator images
+
+- include_tasks: pre-deploy.yml
+
+- include_tasks: deploy.yml 

@@ -1,14 +1,6 @@
 ---
 # OpenDataHub deployment task - deploys operator, DSCI, and DSC
-- name: "Create namespace"
-  live_shell:
-    cmd: "kubectl get namespace {{ application_namespace }} {% raw %}||{% endraw %} kubectl create namespace {{ application_namespace }}"
-  register: create_namespace_result
-
-- name: "Create operator namespace"
-  live_shell:
-    cmd: "kubectl get namespace opendatahub-operator-system {% raw %}||{% endraw %} kubectl create namespace opendatahub-operator-system"
-  register: create_operator_namespace_result
+# Run pre-deploy.yml first to set up namespaces and dependencies
 
 - name: "Check if operator already deployed"
   live_shell:
@@ -19,28 +11,6 @@
 - name: "Display operator check result"
   debug:
     msg: "Operator deployment status: {{ 'EXISTS' if check_operator_result.rc == 0 else 'NOT FOUND' }}"
-
-- name: "Install CRDs"
-  live_shell:
-    cmd: "make install"
-    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
-  register: install_crds_result
-
-- name: "Install Gateway service CRD"
-  live_shell:
-    cmd: "kubectl apply -f config/crd/bases/services.platform.opendatahub.io_gateways.yaml"
-    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
-  register: install_gateway_crd_result
-
-- name: "Install cert-manager CRDs"
-  live_shell:
-    cmd: "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.crds.yaml"
-  register: install_certmanager_crds_result
-
-- name: "Install cert-manager"
-  live_shell:
-    cmd: "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml"
-  register: install_certmanager_result
 
 - name: "Deploy operator"
   live_shell:
@@ -137,15 +107,20 @@
     - "/tmp/dsc-config.yaml"
   register: cleanup_result
 
-- name: "Display deployment summary"
+- name: "OpenDataHub deployment complete"
   debug:
     msg:
-      - "Deployment completed successfully!"
+      - "✅ OpenDataHub deployment completed successfully!"
+      - ""
+      - "🔧 Configuration Summary:"
       - "Operator Namespace: opendatahub-operator-system"
       - "Target Namespace: {{ application_namespace }}"
-      - "DSCI Name: {{ dsci_config.name }}"
-      - "DSC Name: {{ dsc_config.name }}"
-      - "Service Mesh: {{ dsci_config.spec.serviceMesh.managementState | default('Not configured') }}"
-      - "Monitoring: {{ dsci_config.spec.monitoring.managementState | default('Not configured') }}"
-      - "Operator Status: {{ final_operator_status.stdout | default('Status check failed') }}"
-      - "DSC Status: {{ final_dsc_status.stdout | default('Status check failed') }}" 
+      - ""
+      - "📋 Resources Created:"
+      - "✓ DSC Initialization: {{ dsci_config.name }}"
+      - "✓ Data Science Cluster: {{ dsc_config.name }}"
+      - ""
+      - "🌐 Next Steps:"
+      - "- Verify component status: kubectl get pods -n {{ application_namespace }}"
+      - "- Check component logs if needed"
+      - "- Access dashboard and workbenches as configured" 
