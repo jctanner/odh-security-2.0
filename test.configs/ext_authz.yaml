@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kube-auth-proxy-creds
+  namespace: openshift-ingress
+type: Opaque
+stringData:
+  OAUTH2_PROXY_CLIENT_ID: "odh"
+  OAUTH2_PROXY_CLIENT_SECRET: "redhat1234!"
+  OAUTH2_PROXY_COOKIE_SECRET: "CHANGE_THIS_TO_A_32_BYTE_RANDOM_"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-auth-proxy
+  namespace: openshift-ingress
+  labels:
+    app: kube-auth-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kube-auth-proxy
+  template:
+    metadata:
+      labels:
+        app: kube-auth-proxy
+    spec:
+      containers:
+      - name: kube-auth-proxy
+        image: registry.tannerjc.net/kube-auth-proxy:latest
+        args:
+        - --provider=oidc
+        - --oidc-issuer-url=https://keycloak.tannerjc.net/realms/ocp-byoidc-realm
+        - --http-address=0.0.0.0:4180
+        - --email-domain=*
+        - --upstream=static://200
+        - --skip-provider-button
+        - --ssl-insecure-skip-verify=true
+        - --pass-access-token=true
+        - --set-xauthrequest=true
+        env:
+        - name: OAUTH2_PROXY_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: kube-auth-proxy-creds
+              key: OAUTH2_PROXY_CLIENT_ID
+        - name: OAUTH2_PROXY_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kube-auth-proxy-creds
+              key: OAUTH2_PROXY_CLIENT_SECRET
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kube-auth-proxy-creds
+              key: OAUTH2_PROXY_COOKIE_SECRET
+        ports:
+        - containerPort: 4180
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-auth-proxy
+  namespace: openshift-ingress
+spec:
+  selector:
+    app: kube-auth-proxy
+  ports:
+  - name: http
+    port: 4180
+    targetPort: 4180
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: authn-filter
+  namespace: openshift-ingress
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: odh-gateway
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.router"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.ext_authz
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          transport_api_version: V3
+          http_service:
+            server_uri:
+              uri: http://kube-auth-proxy.openshift-ingress.svc.cluster.local:4180/oauth2/auth
+              cluster: kube-auth-proxy
+              timeout: 0.5s
+            authorization_request:
+              allowed_headers:
+                patterns:
+                - exact: cookie
+            authorization_response:
+              allowed_upstream_headers:
+                patterns:
+                - exact: x-auth-request-user
+                - exact: x-auth-request-email
+                - exact: x-auth-request-access-token
+              allowed_client_headers:
+                patterns:
+                - exact: set-cookie
+  - applyTo: HTTP_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.router"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.lua
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
+          inline_code: |
+            function envoy_on_request(request_handle)
+              local access_token = request_handle:headers():get("x-auth-request-access-token")
+              if access_token then
+                request_handle:headers():add("x-forwarded-access-token", access_token)
+              end
+            end
+  - applyTo: CLUSTER
+    match:
+      context: GATEWAY
+    patch:
+      operation: ADD
+      value:
+        name: kube-auth-proxy
+        type: STRICT_DNS
+        connect_timeout: 0.5s
+        load_assignment:
+          cluster_name: kube-auth-proxy
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: kube-auth-proxy.openshift-ingress.svc.cluster.local
+                    port_value: 4180
