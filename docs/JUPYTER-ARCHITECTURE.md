@@ -45,6 +45,16 @@ Here's the end-to-end flow:
 
 The `odh-notebook-controller` supports two networking modes, which are controlled by the `NETWORK_MODE` environment variable. If this variable is not set or is empty, the controller defaults to the **Standard Mode**.
 
+The controller's logic for this is straightforward. An unset `NETWORK_MODE` environment variable results in an empty string, which does not match `"gateway-api"`, causing the controller to fall back to the `else` block for standard behavior.
+
+```go
+if GetNetworkMode() == "gateway-api" {
+    // Gateway API logic
+} else {
+    // Standard logic (OpenShift Route, oauth-proxy)
+}
+```
+
 ### Standard Mode
 
 In the standard mode, the controller creates a `Route` to expose the notebook. If OAuth is enabled, it also injects an `oauth-proxy` sidecar to handle authentication.
