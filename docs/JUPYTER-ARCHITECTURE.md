@@ -43,7 +43,7 @@ Here's the end-to-end flow:
 
 ## Networking Modes
 
-The `odh-notebook-controller` supports two networking modes, which are controlled by the `NETWORK_MODE` environment variable:
+The `odh-notebook-controller` supports two networking modes, which are controlled by the `NETWORK_MODE` environment variable. If this variable is not set or is empty, the controller defaults to the **Standard Mode**.
 
 ### Standard Mode
 
