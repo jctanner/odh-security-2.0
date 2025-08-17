@@ -55,6 +55,15 @@ if GetNetworkMode() == "gateway-api" {
 }
 ```
 
+The `GetNetworkMode` function itself is a simple wrapper around `os.Getenv`:
+
+```go
+// GetNetworkMode returns the network mode from the environment variable.
+func GetNetworkMode() string {
+	return os.Getenv("NETWORK_MODE")
+}
+```
+
 ### Standard Mode
 
 In the standard mode, the controller creates a `Route` to expose the notebook. If OAuth is enabled, it also injects an `oauth-proxy` sidecar to handle authentication.
