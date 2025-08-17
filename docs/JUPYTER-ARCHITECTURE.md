@@ -2,6 +2,19 @@
 
 This document outlines the architecture of the Jupyter notebook deployment within the OpenDataHub ecosystem. It assumes that you have a `src` directory in your current working directory that contains checkouts of the various OpenDataHub and Kubeflow repositories. All file paths in this document will be relative to the project root (e.g., `./src/<repo-name>/...`).
 
+> [!WARNING]
+> **Developer Caveat: Running Without the Webhook**
+>
+> It is common during development to run the `opendatahub-operator` directly from the command line (e.g., using `make run` or `make run-nowebhook`). Be aware that running the operator **without** its webhook component (i.e., using `make run-nowebhook`) will severely limit notebook functionality.
+>
+> The mutating admission webhook is essential for:
+> *   Injecting the `oauth-proxy` or `debug-proxy` sidecars.
+> *   Resolving `ImageStream` tags to immutable container image digests.
+> *   Mounting necessary configurations like trusted CA bundles.
+> *   Preventing race conditions during notebook startup via a reconciliation lock.
+>
+> Without the webhook, attempts to create a notebook will fail or result in a non-functional workbench. For any end-to-end development or testing of notebook features, you must ensure the webhook is running.
+
 ## Overview
 
 Jupyter notebooks are managed by a combination of the `opendatahub-operator` and a specialized `odh-notebook-controller`. The `opendatahub-operator` is responsible for the overall lifecycle of the OpenDataHub components, including the deployment of the notebook controller. The `odh-notebook-controller` is a customized version of the upstream Kubeflow notebook controller that includes features specific to OpenDataHub, such as OAuth integration and custom certificate management.
@@ -190,5 +203,4 @@ The webhook performs several key functions to prepare a notebook for launch:
 *   **Reconciliation Lock**: To prevent race conditions, the webhook adds a "stop" annotation (`culler.STOP_ANNOTATION`) to the `Notebook` resource. This annotation pauses the Kubeflow notebook controller, preventing it from starting the pod until the `odh-notebook-controller` has completed its own reconciliation (e.g., creating the necessary `ServiceAccount`, `Secrets`, etc.). The `odh-notebook-controller` removes this annotation once it's finished.
 *   **Configuration Mounting**: The webhook mounts various configurations into the notebook pod, including:
     *   A trusted CA certificate bundle (`workbench-trusted-ca-bundle`) for environments with custom CAs.
-    *   `ConfigMaps` and `Secrets` related to Elyra AI pipelines and data science pipeline runtimes.
-*   **Proxy Environment Variables**: If a cluster-wide proxy is configured, the webhook injects the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables into the notebook container.
+    *   `
