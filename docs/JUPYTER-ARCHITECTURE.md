@@ -160,7 +160,7 @@ graph TD
         F -- "Yes" --> G["Creates HTTPRoute"];
         F -- "Yes" --> H["Injects debug-proxy sidecar"];
         F -- "No (default)" --> I["Creates OpenShift Route"];
-        F -- "No (default)" -- "if annotation is present" --> J["Injects oauth-proxy sidecar"];
+        F -- "No (default)<br/>if annotation present" --> J["Injects oauth-proxy sidecar"];
     end
 
     subgraph "Mutating Webhook"
