@@ -160,6 +160,35 @@ graph TD
         F -- "Yes" --> G["Creates HTTPRoute"];
         F -- "Yes" --> H["Injects debug-proxy sidecar"];
         F -- "No (default)" --> I["Creates OpenShift Route"];
-        F -- "No (default)" --> J["Injects oauth-proxy sidecar"];
+        F -- "No (default)" -- "if annotation is present" --> J["Injects oauth-proxy sidecar"];
     end
+
+    subgraph "Mutating Webhook"
+        direction LR
+        MW["notebooks.opendatahub.io"]
+        E --> MW;
+        MW -- "Intercepts CREATE/UPDATE" --> D;
+    end
+
+    style MW fill:#f9f,stroke:#333,stroke-width:2px
 ```
+
+## Mutating Admission Webhook
+
+A critical component of the notebook architecture is the `notebooks.opendatahub.io` mutating admission webhook. This webhook intercepts `CREATE` and `UPDATE` requests for `Notebook` resources and performs a series of modifications before the resource is persisted to etcd.
+
+The error message `failed calling webhook "notebooks.opendatahub.io"` typically indicates that the webhook is not running or is misconfigured, preventing the creation or update of notebooks.
+
+The webhook is defined in the manifests at `./src/kubeflow/components/odh-notebook-controller/config/webhook/manifests.yaml` and the core logic is implemented in `./src/kubeflow/components/odh-notebook-controller/controllers/notebook_webhook.go`.
+
+### Key Functions
+
+The webhook performs several key functions to prepare a notebook for launch:
+
+*   **OAuth Proxy Injection**: If the `opendatahub.io/inject-oauth` annotation is present on the `Notebook` resource, the webhook injects an `oauth-proxy` sidecar container. In `gateway-api` mode, this is replaced by a `debug-proxy` container.
+*   **Image Resolution**: It resolves the final container image for the notebook. If the image name in the `Notebook` spec points to an `ImageStream`, the webhook replaces it with the immutable image hash (`<registry>/<namespace>/<image>@<sha256:...>`). This ensures that the running notebook is always based on a specific, reproducible image version.
+*   **Reconciliation Lock**: To prevent race conditions, the webhook adds a "stop" annotation (`culler.STOP_ANNOTATION`) to the `Notebook` resource. This annotation pauses the Kubeflow notebook controller, preventing it from starting the pod until the `odh-notebook-controller` has completed its own reconciliation (e.g., creating the necessary `ServiceAccount`, `Secrets`, etc.). The `odh-notebook-controller` removes this annotation once it's finished.
+*   **Configuration Mounting**: The webhook mounts various configurations into the notebook pod, including:
+    *   A trusted CA certificate bundle (`workbench-trusted-ca-bundle`) for environments with custom CAs.
+    *   `ConfigMaps` and `Secrets` related to Elyra AI pipelines and data science pipeline runtimes.
+*   **Proxy Environment Variables**: If a cluster-wide proxy is configured, the webhook injects the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` environment variables into the notebook container.
