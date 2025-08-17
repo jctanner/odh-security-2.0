@@ -1,4 +1,4 @@
-# Jupyter Notebook Architecture
+"# Jupyter Notebook Architecture
 
 This document outlines the architecture of the Jupyter notebook deployment within the OpenDataHub ecosystem.
 
@@ -76,15 +76,15 @@ graph TD
     end
 
     B --> B_DSCI;
-    B_DSCI -- "1. Reads config & updates manifests" --> C["params.env with<br/>NETWORK_MODE=gateway-api"];
+    B_DSCI -- "Reads config & updates manifests" --> C["params.env with<br/>NETWORK_MODE=gateway-api"];
     
     B --> B_WB;
-    B_WB -- "2. Deploys using Kustomize" --> D["odh-notebook-controller<br/>Deployment"];
+    B_WB -- "Deploys using Kustomize" --> D["odh-notebook-controller<br/>Deployment"];
     C -- "provides env var to" --> D;
     
     E["User creates Notebook CR"] --> D;
 
-    D -- "3. Reconciles Notebook CR" --> D;
+    D -- "Reconciles Notebook CR" --> D;
 
     subgraph "odh-notebook-controller Behavior"
         D -- "Reads NETWORK_MODE" --> F{"if NETWORK_MODE == gateway-api"};
