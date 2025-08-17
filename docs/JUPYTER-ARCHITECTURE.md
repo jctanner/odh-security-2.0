@@ -102,6 +102,36 @@ The process is as follows:
 
 Therefore, to change the image used for the `odh-notebook-controller`, you must modify the `params.env` file.
 
+#### Example: Changing the Notebook Controller Image
+
+To change the controller image to `registry.tannerjc.net/odh-notebooks:byoidc`, you would edit the `params.env` file as follows:
+
+**Before:**
+```
+odh-notebook-controller-image=quay.io/opendatahub/odh-notebook-controller:main
+```
+
+**After:**
+```
+odh-notebook-controller-image=registry.tannerjc.net/odh-notebooks:byoidc
+```
+
+When the `opendatahub-operator` next reconciles the `workbenches` component, it will deploy the `odh-notebook-controller` using this new image.
+
+## Manifest Source Management
+
+The `opendatahub-operator` uses a script, `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/get_all_manifests.sh`, to manage the sources for the component manifests. This script is responsible for fetching the correct manifests for each component and placing them in the `opt/manifests` directory.
+
+The script uses an associative array, `COMPONENT_MANIFESTS`, to define the source for each component's manifests. The entry for the `odh-notebook-controller` is as follows:
+
+```bash
+["workbenches/odh-notebook-controller"]="opendatahub-io:kubeflow:main:components/odh-notebook-controller/config"
+```
+
+This line tells the script to fetch the manifests for the `odh-notebook-controller` from the `components/odh-notebook-controller/config` directory of the `opendatahub-io/kubeflow` repository.
+
+This mechanism allows the `opendatahub-operator` to be flexible and use different manifest sources for each component. It's how the operator is configured to use the customized `odh-notebook-controller` instead of the upstream `kf-notebook-controller`.
+
 ## Architecture Diagram
 
 ```mermaid
