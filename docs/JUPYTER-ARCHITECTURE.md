@@ -1,6 +1,6 @@
-"# Jupyter Notebook Architecture
+# Jupyter Notebook Architecture
 
-This document outlines the architecture of the Jupyter notebook deployment within the OpenDataHub ecosystem.
+This document outlines the architecture of the Jupyter notebook deployment within the OpenDataHub ecosystem. It assumes that you have a `src` directory in your current working directory that contains checkouts of the various OpenDataHub and Kubeflow repositories. All file paths in this document will be relative to the project root (e.g., `./src/<repo-name>/...`).
 
 ## Overview
 
@@ -33,7 +33,7 @@ Here's the end-to-end flow:
 
 2.  **`dscinitialization` Controller**: The `dscinitialization` controller in the `opendatahub-operator` reconciles the `DSCInitialization` resource. It reads the value of the `networking.mode` field and stores it in a variable.
 
-3.  **Parameter Application**: The `dscinitialization` controller then calls the `deploy.ApplyParams` function, which updates the `params.env` file in the `odh-notebook-controller`'s manifests (`/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/base/params.env`). It sets the `NETWORK_MODE` environment variable in this file to the value from the `DSCInitialization` spec.
+3.  **Parameter Application**: The `dscinitialization` controller then calls the `deploy.ApplyParams` function, which updates the `params.env` file in the `odh-notebook-controller`'s manifests (`./src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/base/params.env`). It sets the `NETWORK_MODE` environment variable in this file to the value from the `DSCInitialization` spec.
 
 4.  **`workbenches` Controller**: The `workbenches` controller in the `opendatahub-operator` uses Kustomize to build and deploy the `odh-notebook-controller`. As part of this process, it creates a `ConfigMap` from the `params.env` file.
 
@@ -78,7 +78,7 @@ When the `NETWORK_MODE` is set to `gateway-api`, the controller's behavior is mo
 
 ## Manifests
 
-The `odh-notebook-controller` is configured through a set of Kustomize manifests located in `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller`. These manifests define the resources that are deployed by the controller, including the controller's deployment, RBAC rules, and webhook configurations.
+The `odh-notebook-controller` is configured through a set of Kustomize manifests located in `./src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller`. These manifests define the resources that are deployed by the controller, including the controller's deployment, RBAC rules, and webhook configurations.
 
 The `params.env` file in the `base` directory is used to set the image for the `odh-notebook-controller` container. This can be customized to use a different image for development or testing.
 
@@ -88,11 +88,11 @@ The image for the `odh-notebook-controller` is not defined directly in the `work
 
 The process is as follows:
 
-1.  The `workbenches` controller deploys the `odh-notebook-controller` using the manifests located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/`. These manifests are copied from `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/kubeflow/components/odh-notebook-controller/config/` during the build process.
+1.  The `workbenches` controller deploys the `odh-notebook-controller` using the manifests located at `./src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/`. These manifests are copied from `./src/kubeflow/components/odh-notebook-controller/config/` during the build process.
 
 2.  The `kustomization.yaml` file in the `base` directory (`.../base/kustomization.yaml`) creates a `ConfigMap` from the `params.env` file.
 
-3.  The `params.env` file, located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/kubeflow/components/odh-notebook-controller/config/base/params.env`, contains the image definition:
+3.  The `params.env` file, located at `./src/kubeflow/components/odh-notebook-controller/config/base/params.env`, contains the image definition:
 
     ```
     odh-notebook-controller-image=quay.io/opendatahub/odh-notebook-controller:main
@@ -104,7 +104,7 @@ Therefore, to change the image used for the `odh-notebook-controller`, you must 
 
 #### Example: Changing the Notebook Controller Image
 
-To change the controller image to `registry.tannerjc.net/odh-notebooks:byoidc`, you would edit `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/kubeflow/components/odh-notebook-controller/config/base/params.env` as follows:
+To change the controller image to `registry.tannerjc.net/odh-notebooks:byoidc`, you would edit `./src/kubeflow/components/odh-notebook-controller/config/base/params.env` as follows:
 
 **Before:**
 ```
@@ -120,7 +120,7 @@ When the `opendatahub-operator` next reconciles the `workbenches` component, it 
 
 ## Manifest Source Management
 
-The `opendatahub-operator` uses a script, `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/get_all_manifests.sh`, to manage the sources for the component manifests. This script is responsible for fetching the correct manifests for each component and placing them in the `opt/manifests` directory.
+The `opendatahub-operator` uses a script, `./src/opendatahub-operator/get_all_manifests.sh`, to manage the sources for the component manifests. This script is responsible for fetching the correct manifests for each component and placing them in the `opt/manifests` directory.
 
 The script uses an associative array, `COMPONENT_MANIFESTS`, to define the source for each component's manifests. The entry for the `odh-notebook-controller` is as follows:
 
