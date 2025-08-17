@@ -82,6 +82,26 @@ The `odh-notebook-controller` is configured through a set of Kustomize manifests
 
 The `params.env` file in the `base` directory is used to set the image for the `odh-notebook-controller` container. This can be customized to use a different image for development or testing.
 
+## Notebook Controller Image Configuration
+
+The image for the `odh-notebook-controller` is not defined directly in the `workbenches` controller's code. Instead, it is defined in the Kustomize manifests that are used to deploy the controller.
+
+The process is as follows:
+
+1.  The `workbenches` controller deploys the `odh-notebook-controller` using the manifests located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/`.
+
+2.  The `kustomization.yaml` file in the `base` directory (`.../base/kustomization.yaml`) creates a `ConfigMap` from the `params.env` file.
+
+3.  The `params.env` file, located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/base/params.env`, contains the image definition:
+
+    ```
+    odh-notebook-controller-image=quay.io/opendatahub/odh-notebook-controller:main
+    ```
+
+4.  The `kustomization.yaml` then patches the `manager` Deployment for the `odh-notebook-controller`, setting the container image to the value from the `ConfigMap`.
+
+Therefore, to change the image used for the `odh-notebook-controller`, you must modify the `params.env` file.
+
 ## Architecture Diagram
 
 ```mermaid
