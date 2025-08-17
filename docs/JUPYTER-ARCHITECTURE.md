@@ -88,11 +88,11 @@ The image for the `odh-notebook-controller` is not defined directly in the `work
 
 The process is as follows:
 
-1.  The `workbenches` controller deploys the `odh-notebook-controller` using the manifests located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/`.
+1.  The `workbenches` controller deploys the `odh-notebook-controller` using the manifests located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/`. These manifests are copied from `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/kubeflow/components/odh-notebook-controller/config/` during the build process.
 
 2.  The `kustomization.yaml` file in the `base` directory (`.../base/kustomization.yaml`) creates a `ConfigMap` from the `params.env` file.
 
-3.  The `params.env` file, located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/opendatahub-operator/opt/manifests/workbenches/odh-notebook-controller/base/params.env`, contains the image definition:
+3.  The `params.env` file, located at `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/kubeflow/components/odh-notebook-controller/config/base/params.env`, contains the image definition:
 
     ```
     odh-notebook-controller-image=quay.io/opendatahub/odh-notebook-controller:main
@@ -100,11 +100,11 @@ The process is as follows:
 
 4.  The `kustomization.yaml` then patches the `manager` Deployment for the `odh-notebook-controller`, setting the container image to the value from the `ConfigMap`.
 
-Therefore, to change the image used for the `odh-notebook-controller`, you must modify the `params.env` file.
+Therefore, to change the image used for the `odh-notebook-controller`, you must modify the source `params.env` file.
 
 #### Example: Changing the Notebook Controller Image
 
-To change the controller image to `registry.tannerjc.net/odh-notebooks:byoidc`, you would edit the `params.env` file as follows:
+To change the controller image to `registry.tannerjc.net/odh-notebooks:byoidc`, you would edit `/home/jtanner/workspace/github/jctanner.redhat/odh-security-2.0.test/src/kubeflow/components/odh-notebook-controller/config/base/params.env` as follows:
 
 **Before:**
 ```
