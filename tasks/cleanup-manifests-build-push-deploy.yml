@@ -4,6 +4,8 @@
 
 - include_tasks: cleanup.yml
 
+- include_tasks: manifests.yml
+
 - include_tasks: build.yml
 
 - include_tasks: push.yml
