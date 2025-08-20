@@ -78,14 +78,10 @@ deployment:
       #   managementState: "Managed"  # Uncomment to enable monitoring
       #   namespace: "opendatahub"
       applicationsNamespace: "opendatahub"
-      # serviceMesh:
-      #   managementState: "Managed"  # Uncomment and configure if Istio is available
-      #   controlPlane:
-      #     metricsCollection: "Istio"
-      #     name: "data-science-smcp"
-      #     namespace: "istio-system"
       networking:
         mode: "gateway-api"  # "standard" or "gateway-api"
+      serviceMesh:
+        managementState: Removed
       trustedCABundle:
         managementState: "Managed"
         customCABundle: ""
