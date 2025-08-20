@@ -55,6 +55,11 @@
 #    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
 #  register: apply_rbac_result
 
+# WORKAROUND - we need to fix this permanently with more fine grain perms
+- name: "WORKAROUND: fix permissions"
+  live_shell:
+    cmd: oc adm policy add-cluster-role-to-user cluster-admin -z opendatahub-operator-controller-manager -n opendatahub-operator-system
+
 - name: "Wait for DSCI to be ready"
   live_shell:
     cmd: "kubectl wait --for=condition=Available dscinitializations.dscinitialization.opendatahub.io/{{ dsci_config.name }} -n {{ application_namespace }} --timeout={{ wait_timeout }}s"
