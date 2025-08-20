@@ -13,3 +13,4 @@ requests
 # Additional useful modules that complement ansible-core
 # (these provide additional Ansible modules if needed)
 # ansible-posix
+black
