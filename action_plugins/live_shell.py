@@ -47,6 +47,8 @@ class ActionModule(ActionBase):
             for key, value in task_env.items():
                 env[key] = self._templar.template(str(value), task_vars)
 
+        import q; q(task_env)
+
         # Command is already templated by Ansible before reaching action plugin
         templated_command = command
 

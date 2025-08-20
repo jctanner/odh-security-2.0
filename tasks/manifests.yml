@@ -3,13 +3,5 @@
 
 - name: "Assemble local manifests"
   live_shell:
-    cmd: "make get-manifests-local"
+    cmd: "USE_LOCAL=true ./get_all_manifests.sh"
     chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
-    environment:
-      FORK_ORG: "{{ fork_org }}"
-      BRANCH_NAME: "{{ branch_name }}"
-      LOCAL_MODE: "true"
-      LOCAL_CHECKOUTS_DIR: "{{ local_checkouts_dir }}"
-      CUSTOM_REGISTRY_URL: "{{ registry_url }}"
-      CUSTOM_REGISTRY_NAMESPACE: "{{ registry_namespace }}"
-      CUSTOM_REGISTRY_TAG: "{{ registry_tag }}"

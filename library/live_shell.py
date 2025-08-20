@@ -73,6 +73,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 def main():
     """Main module function - this is just a placeholder since the action plugin does the real work"""
+
     module = AnsibleModule(
         argument_spec=dict(
             cmd=dict(type="str", required=True),

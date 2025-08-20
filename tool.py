@@ -1466,6 +1466,10 @@ For build and deployment operations, use the Ansible-based task system:
         "--show", metavar="NAME", help="Show details of a specific task file"
     )
 
+    workflow_parser.add_argument(
+        "--verbose", action="store_true", help="Pass -v to ansible-playbook"
+    )
+
     workflow_group.add_argument(
         "--vars",
         nargs="?",
