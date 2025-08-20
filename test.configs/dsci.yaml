@@ -6,6 +6,8 @@ spec:
   applicationsNamespace: opendatahub
   networking:
     mode: 'gateway-api'
+  serviceMesh:
+    managementState: Removed
   trustedCABundle:
     customCABundle: ''
     managementState: Managed

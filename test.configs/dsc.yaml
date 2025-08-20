@@ -6,5 +6,5 @@ spec:
   components:
     dashboard:
       managementState: Managed
-    #workbenches:
-    #  managementState: Managed
+    workbenches:
+      managementState: Managed

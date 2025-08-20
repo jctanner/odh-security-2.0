@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odh-dashboard
+  namespace: opendatahub
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: odh-dashboard }
+  template:
+    metadata:
+      labels: { app: odh-dashboard }
+    spec:
+      containers:
+      - name: echo
+        image: hashicorp/http-echo:0.2.3
+        args: ["-listen=:8081", "-text=odh-dashboard stub"]
+        ports:
+        - name: http
+          containerPort: 8081
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: odh-dashboard
+  namespace: opendatahub
+spec:
+  selector: { app: odh-dashboard }
+  ports:
+  - name: http
+    port: 8081
+    targetPort: http
