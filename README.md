@@ -142,3 +142,13 @@ pip install <package>
 # Update requirements.txt when adding new dependencies
 pip freeze > requirements.txt
 ``` 
+
+# ODH Dashboard
+
+make build push IMAGE_REPOSITORY=registry.tannerjc.net/odh-dashboard:byoidc
+
+
+# Notebooks
+cd src/kubeflow/components/
+podman build -t registry.tannerjc.net/odh-notebooks:byoidc -f odh-notebook-controller/Dockerfile .
+podman push registry.tannerjc.net/odh-notebooks:byoidc
