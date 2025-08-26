@@ -39,23 +39,49 @@ The controller will enforce authentication at the gateway level and streamline t
 
 ## 2. Architecture
 
+The following diagram illustrates the components of the gateway architecture and the request flow for an incoming user request.
+
 ```mermaid
-graph TD;
-    A["main() [cmd/main.go]"] --> B{"ctrl.NewManager"};
-    A --> C["initServices()"];
-    C --> D["sr.ForEach(handler)"];
-    subgraph "Service Controllers";
-        direction LR;
-        E["_ [internal/controller/services/auth]"];
-        F["_ [internal/controller/services/monitoring]"];
-        G["_ [/gateway]"];
-    end;
-    D -- "runs init() on import" --> G;
-    A --> H["CreateServiceReconcilers()"];
-    H --> I["sr.ForEach(handler)"];
-    I --> J{"handler.NewReconciler(mgr)"};
-    J -- "registers with manager" --> B;
-    B --> K["mgr.Start()"];
+graph TD
+    subgraph "Control Plane (in opendatahub-operator)"
+        A["Gateway Controller"]
+    end
+
+    subgraph "Kubernetes API Resources"
+        GC["GatewayClass"]
+        G["Gateway"]
+        KAP_SVC["Service (kube-auth-proxy)"]
+        KAP_DEPLOY["Deployment (kube-auth-proxy)"]
+    end
+
+    subgraph "Data Plane (running in openshift-ingress)"
+        EP["Envoy Proxy"]
+    end
+
+    subgraph "Authentication Service"
+        KAP_POD["kube-auth-proxy Pod"]
+    end
+
+    A -- "Creates/Manages" --> GC
+    A -- "Creates/Manages" --> G
+    A -- "Creates/Manages" --> KAP_SVC
+    A -- "Creates/Manages" --> KAP_DEPLOY
+
+    G -- "Provisions" --> EP
+    
+    style EP fill:#d4f0fd,stroke:#369,stroke-width:2px
+
+    subgraph "Request Flow"
+        direction LR
+        U["User"] --> EP
+        EP -- "ext_authz check" --> KAP_POD
+        KAP_POD -- "AuthN/AuthZ" --> OIDC["OIDC Provider /<br/>OpenShift OAuth"]
+        KAP_POD -- "OK/Deny" --> EP
+        EP -- "Proxies to" --> US["Upstream Service"]
+    end
+
+    KAP_DEPLOY -- "Creates" --> KAP_POD
+    KAP_SVC -- "Routes traffic to" --> KAP_POD
 ```
 
 The new gateway controller will be located in `internal/controller/services/gateway` within the `opendatahub-operator` repository, aligning with the existing project structure.
@@ -178,4 +204,32 @@ spec:
     issuerUrl: "https://my-oidc-provider.com/auth/realms/my-realm"
     clientId: "opendatahub"
     clientSecretName: "oidc-client-secret"
+```
+
+### Operator Initialization Flow
+
+The following diagram illustrates how the operator's main entrypoint initializes and registers the service controllers, including the proposed gateway controller.
+
+1.  The `main()` function in `cmd/main.go` starts the process and creates a new controller manager.
+2.  During initialization (`initServices`), the operator iterates through all service controller packages that have been imported. The Go `init()` function in each package registers a handler with the service registry.
+3.  Later, `CreateServiceReconcilers` iterates through the registered handlers and calls `NewReconciler()` for each, which sets up the specific controller's reconciler with the manager.
+4.  Finally, the manager is started, and all registered controllers begin their reconciliation loops.
+
+```mermaid
+graph TD;
+    A["main() [cmd/main.go]"] --> B{"ctrl.NewManager"};
+    A --> C["initServices()"];
+    C --> D["sr.ForEach(handler)"];
+    subgraph "Service Controllers";
+        direction LR;
+        E["_ [internal/controller/services/auth]"];
+        F["_ [internal/controller/services/monitoring]"];
+        G["_ [/gateway]"];
+    end;
+    D -- "runs init() on import" --> G;
+    A --> H["CreateServiceReconcilers()"];
+    H --> I["sr.ForEach(handler)"];
+    I --> J{"handler.NewReconciler(mgr)"};
+    J -- "registers with manager" --> B;
+    B --> K["mgr.Start()"];
 ```
