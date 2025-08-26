@@ -139,11 +139,12 @@ To prevent a broken or insecure deployment, the controller will handle missing O
 
 This project will be implemented in phases to allow for iterative development and testing.
 
-### Phase 1: Core Gateway Controller
+### Phase 1: Documentation and Core Controller Setup
 
-- [ ] **Task 1.1:** Finalize and merge the `Gateway` CRD definition based on the POC patch.
-- [ ] **Task 1.2:** Implement the basic gateway controller in `internal/controller/services/gateway`. This controller will create the `GatewayClass` and `Gateway` resources.
-- [ ] **Task 1.3:** Implement TLS certificate management, supporting both `cert-manager` and user-provided secrets. The logic from the POC patch can be adapted for this.
+- [ ] **Task 1.1:** Commit this design document to a suitable location (TBD) within the `opendatahub-operator` repository.
+- [ ] **Task 1.2:** Create and merge the new `Gateway` CRD definition. The POC patch (`src/poc-patch.diff`) should be used as a reference for the API structure.
+- [ ] **Task 1.3:** Implement the basic gateway controller in `internal/controller/services/gateway`. This controller will create the `GatewayClass` and `Gateway` resources.
+- [ ] **Task 1.4:** Implement TLS certificate management, supporting both `cert-manager` and user-provided secrets. The logic from the POC patch can be used as a reference.
 
 ### Phase 2: Authentication Integration
 
