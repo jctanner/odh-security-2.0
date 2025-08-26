@@ -26,6 +26,7 @@ The controller will enforce authentication at the gateway level and streamline t
 | FR-014  | The controller MUST normalize the auth token header to `x-forwarded-token` for downstream services.                                                                     |
 | FR-015  | The controller SHOULD provide an `x-forwarded-user` header.                                                                                                             |
 | FR-016  | The `kube-auth-proxy` service MUST expose its `ext_authz` endpoint over a secure TLS connection.                                                                          |
+| FR-017  | If the authentication mode is determined to be OIDC and the required configuration is not present in the `Auth` CR, the controller MUST NOT expose any services and MUST report a non-ready status condition (e.g., `Reason: AwaitingOIDCConfiguration`). |
 
 ### 1.2. Non-Functional Requirements
 
@@ -117,9 +118,20 @@ The new gateway controller will be located in `internal/controller/services/gate
 Determining whether the cluster uses the internal OpenShift OAuth server or an external OIDC provider is a critical and currently unresolved issue.
 
 > **Warning: Significant Information Gap**
-> A **SPIKE** is required to determine the most reliable method for detecting the cluster's authentication configuration. This is a significant gap in the current design. Potential investigation areas include inspecting the cluster `authentication.config.openshift.io` resource or programmatically checking the status of the internal OAuth server.
+> A **SPIKE** is required to determine the most reliable method for automatically detecting the cluster's authentication configuration. This is a significant gap in the current design. Potential investigation areas include inspecting the cluster `authentication.config.openshift.io` resource or programmatically checking the status of the internal OAuth server.
 >
-> **Fallback Plan:** As a fallback, we will add a field to the `DSCInitialization` spec (`spec.auth.mode`) to allow administrators to explicitly set the mode to `openshift` or `oidc`. This ensures a functional path forward if the automatic detection proves too complex or unreliable.
+> **Fallback Plan:** As a fallback, an administrator can explicitly define the authentication provider in the `Auth` custom resource by setting the `spec.provider` field to `OpenShift` or `OIDC`. This ensures a functional path forward if the automatic detection proves too complex or unreliable.
+
+### 2.4. Graceful Handling of Missing Configuration
+
+To prevent a broken or insecure deployment, the controller will handle missing OIDC configuration gracefully. The logic is as follows:
+
+1.  **Determine Auth Mode:** The controller will first determine the authentication mode by checking the `spec.provider` field in the `Auth` CR. If this field is not set, it will attempt to auto-detect the mode (as per the outcome of **SPIKE-001**).
+2.  **Conditional Logic:**
+    *   If the mode is `OpenShift`, the controller will proceed with gateway setup, ignoring any OIDC configuration.
+    *   If the mode is `OIDC`, the controller will then check for the required OIDC details in the `Auth` CR.
+        *   If the details are present and valid, it will proceed with gateway setup.
+        *   If the details are missing, the controller will **halt the deployment of services through the gateway**. It will set the `Gateway` resource's status to `Ready: False` with a clear reason like `AwaitingOIDCConfiguration` and will requeue the request to re-check periodically. This ensures the system is "fail-secure" and provides clear feedback to the administrator.
 
 ## 3. Implementation Roadmap
 
@@ -137,7 +149,7 @@ This project will be implemented in phases to allow for iterative development an
 2.  **Task 2.2:** Add logic to the gateway controller to configure the `Gateway` with the `ext_authz` filter pointing to `kube-auth-proxy`.
 3.  **Task 2.3:** Implement the OpenShift OAuth integration for `kube-auth-proxy`.
 4.  **Task 2.4:** Extend the `Auth` CRD (`auth_types.go`) to include fields for OIDC configuration (issuer URL, client ID, client secret name).
-5.  **Task 2.5:** Implement the OIDC integration, reading the configuration from the extended `Auth` CR.
+5.  **Task 2.5:** Implement the OIDC integration, reading the configuration from the extended `Auth` CR. This includes the graceful handling logic to set a "waiting" status condition if the provider is OIDC but the configuration is incomplete.
 6.  **Task 2.6:** Complete the research spike for detecting the cluster's auth mode and implement the detection logic or the explicit DSCI configuration.
 
 ### Phase 3: Component Migration
