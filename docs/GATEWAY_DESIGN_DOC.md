@@ -114,10 +114,12 @@ The new gateway controller will be located in `internal/controller/services/gate
 
 ### 2.3. Identifying Cluster Authentication Mode
 
-Determining whether the cluster uses the internal OpenShift OAuth server or an external OIDC provider is critical.
+Determining whether the cluster uses the internal OpenShift OAuth server or an external OIDC provider is a critical and currently unresolved issue.
 
-*   **SPIKE:** A research spike is required to determine the most reliable method for detecting the cluster's authentication configuration. This may involve inspecting the cluster `authentication.config.openshift.io` resource or the status of the internal OAuth server.
-*   **Fallback:** As a fallback, we will add a field to the `DSCInitialization` spec (`spec.auth.mode`) to allow administrators to explicitly set the mode to `openshift` or `oidc`.
+> **Warning: Significant Information Gap**
+> A **SPIKE** is required to determine the most reliable method for detecting the cluster's authentication configuration. This is a significant gap in the current design. Potential investigation areas include inspecting the cluster `authentication.config.openshift.io` resource or programmatically checking the status of the internal OAuth server.
+>
+> **Fallback Plan:** As a fallback, we will add a field to the `DSCInitialization` spec (`spec.auth.mode`) to allow administrators to explicitly set the mode to `openshift` or `oidc`. This ensures a functional path forward if the automatic detection proves too complex or unreliable.
 
 ## 3. Implementation Roadmap
 
@@ -174,9 +176,12 @@ This project will be implemented in phases to allow for iterative development an
 
 ## 5. Open Questions & Research Spikes
 
-*   **SPIKE-001:** Determine the best method to automatically detect the cluster's authentication configuration (OpenShift OAuth vs. OIDC).
-*   **Question-001:** What is the best practice for coordinating the `kube-auth-proxy` image version with the devops team to allow for pinning?
-*   **Question-002:** Does `kube-auth-proxy` provide the necessary information to create an `x-forwarded-user` header?
+> **Action Required: Open Questions & Spikes**
+> The following items require further investigation and decisions before implementation can be considered complete.
+>
+> *   **SPIKE-001:** Determine the best method to automatically detect the cluster's authentication configuration (OpenShift OAuth vs. OIDC). This is the most critical unknown.
+> *   **Question-001:** What is the best practice for coordinating the `kube-auth-proxy` image version with the devops team to allow for pinning? This involves defining a process for version management and security scanning.
+> *   **Question-002:** Does `kube-auth-proxy` provide the necessary information to create an `x-forwarded-user` header? This needs to be confirmed by inspecting the proxy's behavior and documentation.
 
 ---
 *This document is based on the initial pre-design, analysis of the `opendatahub-operator` source code, the POC patch provided in `src/poc-patch.diff`, and the official OpenShift Gateway API documentation.*
