@@ -17,7 +17,7 @@ The controller will enforce authentication at the gateway level and streamline t
 | FR-005  | The gateway controller MUST enforce authentication at the gateway level using envoy's `ext_authz` filter and `kube-auth-proxy`.                                           |
 | FR-006  | The controller MUST support two authentication modes for `kube-auth-proxy`: OpenShift OAuth and OIDC.                                                                   |
 | FR-007  | In OpenShift OAuth mode, the controller MUST automatically configure `kube-auth-proxy`'s client and client secret.                                                      |
-| FR-008  | In OIDC mode, the controller MUST allow administrators to provide an issuer URL, client ID, and client secret via a Secret.                                            |
+| FR-008  | In OIDC mode, the controller MUST allow administrators to provide an issuer URL, client ID, and client secret via the `Auth` custom resource.                                            |
 | FR-009  | The controller MUST be able to determine the cluster's authentication configuration (OpenShift OAuth vs. OIDC) or allow explicit configuration in the `DSCI` spec.      |
 | FR-010  | The controller MUST support TLS certificate management using `cert-manager` for automatic certificate generation.                                                       |
 | FR-011  | The controller MUST allow administrators to provide their own TLS certificate bundle via a Secret.                                                                      |
@@ -75,6 +75,8 @@ The new gateway controller will be located in `internal/controller/services/gate
     *   **TLS Security:** The `kube-auth-proxy` service will expose its `ext_authz` endpoint over TLS. This will be secured using OpenShift's serving certificate feature. The controller will add the `service.beta.openshift.io/serving-cert-secret-name` annotation to the `kube-auth-proxy` `Service`. The OpenShift service CA operator will then automatically generate a secret containing a signed TLS certificate and key, which will be mounted into the `kube-auth-proxy` pod.
     *   **Configuration:** The controller will manage the configuration of `kube-auth-proxy` based on the cluster's auth mode (OpenShift OAuth or OIDC).
 
+4.  **Auth CRD:** The existing `Auth` CRD (`auths.services.platform.opendatahub.io`) will be extended to include configuration for OIDC providers. This will centralize authentication and authorization settings. The `AuthSpec` will be modified to include fields for `provider` (e.g. "OpenShift", "OIDC") and an `oidc` struct containing `issuerUrl`, `clientId`, and `clientSecretName`.
+
 ### 2.2. Authentication Flow
 
 1.  A user attempts to access an ODH service endpoint.
@@ -106,8 +108,9 @@ This project will be implemented in phases to allow for iterative development an
 1.  **Task 2.1:** Implement the logic to deploy and configure `kube-auth-proxy` as a central service. This includes creating its `Deployment` and `Service`, and configuring the `Service` with the necessary annotations (`service.beta.openshift.io/serving-cert-secret-name`) to enable automatic TLS serving certificates.
 2.  **Task 2.2:** Add logic to the gateway controller to configure the `Gateway` with the `ext_authz` filter pointing to `kube-auth-proxy`.
 3.  **Task 2.3:** Implement the OpenShift OAuth integration for `kube-auth-proxy`.
-4.  **Task 2.4:** Implement the OIDC integration, allowing configuration via a Secret.
-5.  **Task 2.5:** Complete the research spike for detecting the cluster's auth mode and implement the detection logic or the explicit DSCI configuration.
+4.  **Task 2.4:** Extend the `Auth` CRD (`auth_types.go`) to include fields for OIDC configuration (issuer URL, client ID, client secret name).
+5.  **Task 2.5:** Implement the OIDC integration, reading the configuration from the extended `Auth` CR.
+6.  **Task 2.6:** Complete the research spike for detecting the cluster's auth mode and implement the detection logic or the explicit DSCI configuration.
 
 ### Phase 3: Component Migration
 
@@ -151,3 +154,28 @@ This project will be implemented in phases to allow for iterative development an
 
 ---
 *This document is based on the initial pre-design, analysis of the `opendatahub-operator` source code, the POC patch provided in `src/poc-patch.diff`, and the official OpenShift Gateway API documentation.*
+
+---
+
+## Appendix
+
+### Example `Auth` CR with OIDC Configuration
+
+Below is an example of what the `Auth` custom resource would look like when configured for an external OIDC provider.
+
+```yaml
+apiVersion: services.platform.opendatahub.io/v1alpha1
+kind: Auth
+metadata:
+  name: auth
+spec:
+  provider: OIDC
+  adminGroups:
+    - "odh-admins"
+  allowedGroups:
+    - "system:authenticated"
+  oidc:
+    issuerUrl: "https://my-oidc-provider.com/auth/realms/my-realm"
+    clientId: "opendatahub"
+    clientSecretName: "oidc-client-secret"
+```
