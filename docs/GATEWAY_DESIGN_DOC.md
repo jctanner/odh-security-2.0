@@ -1,8 +1,10 @@
 # ODH Gateway Controller Design Document
 
-This document outlines the design for a new "gateway controller" for the `opendatahub-operator`. This controller will manage the ingress architecture for Open Data Hub (ODH), transitioning from multiple OpenShift Routes to a single, centralized Ingress Gateway using the Kubernetes Gateway API.
+This document outlines the design for a new "gateway controller" for the `opendatahub-operator`. This controller will manage the ingress architecture for Open Data Hub (ODH), transitioning from the current model of multiple OpenShift Routes to a single, centralized Ingress Gateway using the Kubernetes Gateway API.
 
-The controller will enforce authentication at the gateway level and streamline the exposure of ODH services.
+A primary motivation for this architectural change is to enable robust support for OpenShift Container Platform (OCP) clusters configured for "Bring Your Own OIDC" (BYOIDC). In these environments, the internal OpenShift OAuth server is disabled, and the Kubernetes API server is configured as an OIDC client for token validation against an external Identity Provider (IdP). The current `oauth-proxy` sidecar architecture is tightly coupled to the internal OAuth server, making it unsuitable for BYOIDC clusters.
+
+The new gateway architecture will centralize authentication at the ingress layer, using `kube-auth-proxy` to handle authentication against either the internal OpenShift OAuth server or an external OIDC provider. This provides a unified and flexible solution for securing all ODH services, regardless of the cluster's authentication configuration, and streamlines the exposure of these services.
 
 ## 1. Requirements
 
