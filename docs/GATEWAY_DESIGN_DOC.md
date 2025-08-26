@@ -141,26 +141,26 @@ This project will be implemented in phases to allow for iterative development an
 
 ### Phase 1: Core Gateway Controller
 
-1.  **Task 1.1:** Finalize and merge the `Gateway` CRD definition based on the POC patch.
-2.  **Task 1.2:** Implement the basic gateway controller in `internal/controller/services/gateway`. This controller will create the `GatewayClass` and `Gateway` resources.
-3.  **Task 1.3:** Implement TLS certificate management, supporting both `cert-manager` and user-provided secrets. The logic from the POC patch can be adapted for this.
+- [ ] **Task 1.1:** Finalize and merge the `Gateway` CRD definition based on the POC patch.
+- [ ] **Task 1.2:** Implement the basic gateway controller in `internal/controller/services/gateway`. This controller will create the `GatewayClass` and `Gateway` resources.
+- [ ] **Task 1.3:** Implement TLS certificate management, supporting both `cert-manager` and user-provided secrets. The logic from the POC patch can be adapted for this.
 
 ### Phase 2: Authentication Integration
 
-1.  **Task 2.1:** Implement the logic to deploy and configure `kube-auth-proxy` as a central service. This includes creating its `Deployment` and `Service`, and configuring the `Service` with the necessary annotations (`service.beta.openshift.io/serving-cert-secret-name`) to enable automatic TLS serving certificates.
-2.  **Task 2.2:** Add logic to the gateway controller to configure the `Gateway` with the `ext_authz` filter pointing to `kube-auth-proxy`.
-3.  **Task 2.3:** Implement the OpenShift OAuth integration for `kube-auth-proxy`.
-4.  **Task 2.4:** Extend the `Auth` CRD (`auth_types.go`) to include fields for OIDC configuration (issuer URL, client ID, client secret name).
-5.  **Task 2.5:** Implement the OIDC integration, reading the configuration from the extended `Auth` CR. This includes the graceful handling logic to set a "waiting" status condition if the provider is OIDC but the configuration is incomplete.
-6.  **Task 2.6:** Complete the research spike for detecting the cluster's auth mode and implement the detection logic or the explicit DSCI configuration.
+- [ ] **Task 2.1:** Implement the logic to deploy and configure `kube-auth-proxy` as a central service. This includes creating its `Deployment` and `Service`, and configuring the `Service` with the necessary annotations (`service.beta.openshift.io/serving-cert-secret-name`) to enable automatic TLS serving certificates.
+- [ ] **Task 2.2:** Add logic to the gateway controller to configure the `Gateway` with the `ext_authz` filter pointing to `kube-auth-proxy`.
+- [ ] **Task 2.3:** Implement the OpenShift OAuth integration for `kube-auth-proxy`.
+- [ ] **Task 2.4:** Extend the `Auth` CRD (`auth_types.go`) to include fields for OIDC configuration (issuer URL, client ID, client secret name).
+- [ ] **Task 2.5:** Implement the OIDC integration, reading the configuration from the extended `Auth` CR. This includes the graceful handling logic to set a "waiting" status condition if the provider is OIDC but the configuration is incomplete.
+- [ ] **Task 2.6:** Complete the research spike for detecting the cluster's auth mode and implement the detection logic or the explicit DSCI configuration.
 
 ### Phase 3: Component Migration
 
-1.  **Task 3.1:** For each component currently using an OpenShift `Route` and `oauth-proxy` (e.g., KServe, Prometheus), create a separate PR to:
+- [ ] **Task 3.1:** For each component currently using an OpenShift `Route` and `oauth-proxy` (e.g., KServe, Prometheus), create a separate PR to:
     *   Remove the `Route` creation logic.
     *   Create a `HTTPRoute` that attaches to the central `odh-gateway`.
     *   Replace the `oauth-proxy` sidecar with a `kube-rbac-proxy` sidecar for service-level authorization.
-2.  **Task 3.2:** Update any relevant webhooks that might be affected by the move from `Route` objects to `HTTPRoute` objects.
+- [ ] **Task 3.2:** Update any relevant webhooks that might be affected by the move from `Route` objects to `HTTPRoute` objects.
 
 ## 4. Test Plan
 
