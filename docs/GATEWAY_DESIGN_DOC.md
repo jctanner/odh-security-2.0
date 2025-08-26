@@ -25,6 +25,7 @@ The controller will enforce authentication at the gateway level and streamline t
 | FR-013  | The `oauth-proxy` sidecar in existing component deployments MUST be replaced with a `kube-rbac-proxy` sidecar.                                                            |
 | FR-014  | The controller MUST normalize the auth token header to `x-forwarded-token` for downstream services.                                                                     |
 | FR-015  | The controller SHOULD provide an `x-forwarded-user` header.                                                                                                             |
+| FR-016  | The `kube-auth-proxy` service MUST expose its `ext_authz` endpoint over a secure TLS connection.                                                                          |
 
 ### 1.2. Non-Functional Requirements
 
@@ -71,6 +72,7 @@ The new gateway controller will be located in `internal/controller/services/gate
 
 3.  **Authentication Layer:**
     *   **`kube-auth-proxy`:** Deployed as a central service, it will handle the `ext_authz` check from the Envoy-based gateway.
+    *   **TLS Security:** The `kube-auth-proxy` service will expose its `ext_authz` endpoint over TLS. This will be secured using OpenShift's serving certificate feature. The controller will add the `service.beta.openshift.io/serving-cert-secret-name` annotation to the `kube-auth-proxy` `Service`. The OpenShift service CA operator will then automatically generate a secret containing a signed TLS certificate and key, which will be mounted into the `kube-auth-proxy` pod.
     *   **Configuration:** The controller will manage the configuration of `kube-auth-proxy` based on the cluster's auth mode (OpenShift OAuth or OIDC).
 
 ### 2.2. Authentication Flow
@@ -101,7 +103,7 @@ This project will be implemented in phases to allow for iterative development an
 
 ### Phase 2: Authentication Integration
 
-1.  **Task 2.1:** Implement the logic to deploy and configure `kube-auth-proxy` as a central service.
+1.  **Task 2.1:** Implement the logic to deploy and configure `kube-auth-proxy` as a central service. This includes creating its `Deployment` and `Service`, and configuring the `Service` with the necessary annotations (`service.beta.openshift.io/serving-cert-secret-name`) to enable automatic TLS serving certificates.
 2.  **Task 2.2:** Add logic to the gateway controller to configure the `Gateway` with the `ext_authz` filter pointing to `kube-auth-proxy`.
 3.  **Task 2.3:** Implement the OpenShift OAuth integration for `kube-auth-proxy`.
 4.  **Task 2.4:** Implement the OIDC integration, allowing configuration via a Secret.
@@ -149,6 +151,3 @@ This project will be implemented in phases to allow for iterative development an
 
 ---
 *This document is based on the initial pre-design, analysis of the `opendatahub-operator` source code, the POC patch provided in `src/poc-patch.diff`, and the official OpenShift Gateway API documentation.*
-
-
-
