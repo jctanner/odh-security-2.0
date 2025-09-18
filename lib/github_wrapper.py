@@ -490,6 +490,39 @@ class GitHubWrapper:
         """Get the list of additional repositories from configuration"""
         return self.config.get("additional_repositories", [])
 
+    def parse_additional_repositories(self) -> List[Dict[str, Optional[str]]]:
+        """
+        Parse additional repositories with support for org/repo:branch format
+        
+        Returns list of dicts with:
+        - source_repo: "org/repo" (where to fork from)
+        - branch: "branch_name" or None for default branch
+        - repo_name: "repo" (name for the fork)
+        """
+        additional_repos = self.get_additional_repositories()
+        parsed_repos = []
+        
+        for repo_spec in additional_repos:
+            if ':' in repo_spec:
+                # Format: "org/repo:branch"
+                source_repo, branch = repo_spec.split(':', 1)
+                repo_name = source_repo.split('/')[-1]
+                parsed_repos.append({
+                    'source_repo': source_repo,
+                    'branch': branch,
+                    'repo_name': repo_name
+                })
+            else:
+                # Format: "org/repo" (use default branch)
+                repo_name = repo_spec.split('/')[-1]
+                parsed_repos.append({
+                    'source_repo': repo_spec,
+                    'branch': None,
+                    'repo_name': repo_name
+                })
+        
+        return parsed_repos
+
     def should_auto_create_branch(self) -> bool:
         """Check if branches should be automatically created after forking"""
         return self.config.get("migration", {}).get("auto_create_branch", True)

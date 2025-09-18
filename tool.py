@@ -157,19 +157,62 @@ def cmd_clone_forks(args):
 
         print("🔄 Cloning all fork repositories...")
 
+        # Get additional repositories from config first
+        additional_repos = gh.parse_additional_repositories()
+        print(
+            f"📋 Found {len(additional_repos)} additional repositories in configuration"
+        )
+
+        # Check if any additional repository provides opendatahub-operator
+        operator_from_additional = None
+        for repo_info in additional_repos:
+            if repo_info['repo_name'] == 'opendatahub-operator':
+                operator_from_additional = repo_info
+                print(f"✅ Found opendatahub-operator in additional repositories: {repo_info['source_repo']}")
+                if repo_info['branch']:
+                    print(f"    📋 Will use branch: {repo_info['branch']}")
+                else:
+                    print(f"    📋 Will use default branch")
+                break
+
+        # Handle --allow filtering
+        if args.allow:
+            print(f"🎯 Filtering enabled: Only processing repository '{args.allow}'")
+            if args.allow == 'opendatahub-operator':
+                print("    ℹ️  Will process opendatahub-operator and skip all other repositories")
+            else:
+                print("    ℹ️  Will still set up opendatahub-operator (required for manifest parsing)")
+                print(f"    ℹ️  Then process only: {args.allow}")
+
         # Step 1: Ensure opendatahub-operator is available for dependency parsing
-        operator_repo = "opendatahub-io/opendatahub-operator"
         operator_local_path = gh.src_dir / "opendatahub-operator"
         fork_org = gh.get_fork_org()
-        operator_fork_url = f"{fork_org}/opendatahub-operator"
 
         if not operator_local_path.exists():
-            print(
-                f"📋 First setting up {operator_repo} (required for manifest parsing)..."
-            )
+            if operator_from_additional:
+                # Use additional repository for operator
+                source_repo = operator_from_additional['source_repo']
+                branch = operator_from_additional['branch']
+                operator_fork_url = f"{fork_org}/opendatahub-operator"
+                print(f"📋 Setting up opendatahub-operator from additional repository: {source_repo}")
+                if branch:
+                    print(f"    📋 Target branch: {branch}")
+            else:
+                # Use standard operator repository
+                operator_repo = "opendatahub-io/opendatahub-operator"
+                operator_fork_url = f"{fork_org}/opendatahub-operator"
+                print(f"📋 Setting up standard opendatahub-operator: {operator_repo}")
+                
             try:
-                print(f"  🔄 Cloning fork...")
-                result = gh.clone_repository(operator_fork_url)
+                if operator_from_additional:
+                    # Clone directly from source repository (no forking for additional repos)
+                    print(f"  🔄 Cloning directly from {source_repo}...")
+                    clone_url = f"https://github.com/{source_repo}"
+                    result = gh.clone_repository(clone_url)
+                else:
+                    # Standard operator - clone from fork
+                    print(f"  🔄 Cloning fork...")
+                    result = gh.clone_repository(operator_fork_url)
                 if result["cloned"]:
                     print(f"    ✅ Repository cloned to: {result['local_path']}")
                 else:
@@ -177,69 +220,101 @@ def cmd_clone_forks(args):
                         f"    ℹ️  Repository already exists at: {result['local_path']}"
                     )
 
-                # Setup upstream and feature branch for operator too
-                print(f"  🔄 Setting up upstream and rebasing...")
+                # Setup operator repository 
                 repo_path = Path(result["local_path"])
-                upstream_url = f"https://github.com/{operator_repo}"
-                gh.setup_upstream(repo_path, upstream_url)
-
-                print(f"  🔄 Setting up feature branch...")
-                feature_branch = gh.get_branch_name()
-                base_branch = "main"  # opendatahub-operator uses main branch
-
-                if not gh.branch_exists(repo_path, feature_branch):
-                    print(f"    🆕 Creating feature branch '{feature_branch}'...")
-                    gh.create_branch(repo_path, feature_branch, base_branch)
-                else:
-                    print(
-                        f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin..."
-                    )
-                    # Fetch latest from origin
-                    gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
-
-                    # Check if we're already on the target branch
-                    try:
+                
+                if operator_from_additional:
+                    # Additional repo setup - already cloned from source, no upstream needed
+                    print(f"  🔄 Setting up operator from additional repository...")
+                    
+                    if branch:
+                        # Specific branch requested - fetch and checkout from origin
+                        print(f"  🔄 Setting up specific branch: {branch}")
+                        
+                        try:
+                            # Fetch from origin to get latest branches
+                            gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
+                            
+                            # Try to checkout the branch
+                            gh._run_command(["git", "checkout", branch], cwd=repo_path)
+                            print(f"    ✅ Checked out branch: {branch}")
+                        except Exception as branch_error:
+                            print(f"    ⚠️  Could not checkout branch {branch}: {branch_error}")
+                            current_branch_result = gh._run_command(
+                                ["git", "branch", "--show-current"], cwd=repo_path
+                            )
+                            current_branch = current_branch_result.stdout.strip()
+                            print(f"    ℹ️  Staying on current branch: {current_branch}")
+                    else:
+                        # No specific branch - just use current branch
                         current_branch_result = gh._run_command(
                             ["git", "branch", "--show-current"], cwd=repo_path
                         )
                         current_branch = current_branch_result.stdout.strip()
+                        print(f"  ✅ Using current branch: {current_branch}")
+                        
+                else:
+                    # Standard operator - full setup with upstream and feature branches
+                    print(f"  🔄 Setting up upstream and feature branch...")
+                    upstream_url = f"https://github.com/{operator_repo}"
+                    gh.setup_upstream(repo_path, upstream_url)
+                    
+                    feature_branch = gh.get_branch_name()
+                    base_branch = "main"
 
-                        if current_branch == feature_branch:
-                            print(
-                                f"    📍 Already on '{feature_branch}', pulling latest changes..."
-                            )
-                            gh._run_command(
-                                ["git", "pull", "origin", feature_branch], cwd=repo_path
-                            )
-                        else:
-                            print(f"    🔄 Switching to '{feature_branch}' branch...")
-                            # Just checkout to existing local branch (no --track needed)
-                            gh._run_command(
-                                ["git", "checkout", feature_branch], cwd=repo_path
-                            )
-                            gh._run_command(
-                                ["git", "pull", "origin", feature_branch], cwd=repo_path
-                            )
-                    except Exception as checkout_error:
+                    if not gh.branch_exists(repo_path, feature_branch):
+                        print(f"    🆕 Creating feature branch '{feature_branch}' from '{base_branch}'...")
+                        gh.create_branch(repo_path, feature_branch, base_branch)
+                    else:
                         print(
-                            f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}"
+                            f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin..."
                         )
-                        # Fallback: try to create tracking branch if local doesn't exist
+                        # Fetch latest from origin
+                        gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
+
+                        # Check if we're already on the target branch
                         try:
-                            gh._run_command(
-                                [
-                                    "git",
-                                    "checkout",
-                                    "--track",
-                                    f"origin/{feature_branch}",
-                                ],
-                                cwd=repo_path,
+                            current_branch_result = gh._run_command(
+                                ["git", "branch", "--show-current"], cwd=repo_path
                             )
-                        except Exception as track_error:
+                            current_branch = current_branch_result.stdout.strip()
+
+                            if current_branch == feature_branch:
+                                print(
+                                    f"    📍 Already on '{feature_branch}', pulling latest changes..."
+                                )
+                                gh._run_command(
+                                    ["git", "pull", "origin", feature_branch], cwd=repo_path
+                                )
+                            else:
+                                print(f"    🔄 Switching to '{feature_branch}' branch...")
+                                # Just checkout to existing local branch (no --track needed)
+                                gh._run_command(
+                                    ["git", "checkout", feature_branch], cwd=repo_path
+                                )
+                                gh._run_command(
+                                    ["git", "pull", "origin", feature_branch], cwd=repo_path
+                                )
+                        except Exception as checkout_error:
                             print(
-                                f"    ❌ Failed to checkout/track branch: {track_error}"
+                                f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}"
                             )
-                            raise
+                            # Fallback: try to create tracking branch if local doesn't exist
+                            try:
+                                gh._run_command(
+                                    [
+                                        "git",
+                                        "checkout",
+                                        "--track",
+                                        f"origin/{feature_branch}",
+                                    ],
+                                    cwd=repo_path,
+                                )
+                            except Exception as track_error:
+                                print(
+                                    f"    ❌ Failed to checkout/track branch: {track_error}"
+                                )
+                                raise
 
                 print(f"    ✅ Operator setup complete!")
 
@@ -249,63 +324,114 @@ def cmd_clone_forks(args):
                 return 1
         else:
             print(f"✅ Operator repository already available at: {operator_local_path}")
-            # Ensure we're on the feature branch if the repo already exists
+            # Update existing repository based on whether it's from additional repos or standard
             try:
-                feature_branch = gh.get_branch_name()
-                if gh.branch_exists(operator_local_path, feature_branch):
-                    print(
-                        f"    🔄 Updating feature branch '{feature_branch}' from origin..."
-                    )
-                    gh._run_command(["git", "fetch", "origin"], cwd=operator_local_path)
-
-                    # Check if we're already on the target branch
-                    try:
+                if operator_from_additional:
+                    # For additional repo - handle upstream if specific branch requested
+                    if operator_from_additional['branch']:
+                        # Specific branch requested - set up upstream and fetch
+                        target_branch = operator_from_additional['branch']
+                        source_repo = operator_from_additional['source_repo']
+                        print(f"    🔄 Setting up upstream for target branch: {target_branch}")
+                        
+                        # Set up upstream to source repository
+                        upstream_url = f"https://github.com/{source_repo}"
+                        try:
+                            gh.setup_upstream(operator_local_path, upstream_url)
+                            
+                            current_branch_result = gh._run_command(
+                                ["git", "branch", "--show-current"], cwd=operator_local_path
+                            )
+                            current_branch = current_branch_result.stdout.strip()
+                            
+                            if current_branch != target_branch:
+                                try:
+                                    # Fetch from upstream and checkout branch
+                                    gh._run_command(["git", "fetch", "upstream"], cwd=operator_local_path)
+                                    gh._run_command(["git", "checkout", target_branch], cwd=operator_local_path)
+                                    print(f"    ✅ Switched to branch: {target_branch}")
+                                except Exception as branch_error:
+                                    print(f"    ⚠️  Could not switch to branch {target_branch}: {branch_error}")
+                            else:
+                                print(f"    ✅ Already on target branch: {target_branch}")
+                                # Pull latest changes from upstream
+                                try:
+                                    gh._run_command(["git", "fetch", "upstream"], cwd=operator_local_path)
+                                    gh._run_command(["git", "pull", "upstream", target_branch], cwd=operator_local_path)
+                                    print(f"    ✅ Updated from upstream/{target_branch}")
+                                except Exception as pull_error:
+                                    print(f"    ⚠️  Could not pull from upstream: {pull_error}")
+                                    
+                        except Exception as upstream_error:
+                            print(f"    ⚠️  Could not set up upstream: {upstream_error}")
+                    else:
+                        # No specific branch - just report current branch (no upstream needed)
                         current_branch_result = gh._run_command(
                             ["git", "branch", "--show-current"], cwd=operator_local_path
                         )
                         current_branch = current_branch_result.stdout.strip()
-
-                        if current_branch == feature_branch:
-                            print(
-                                f"    📍 Already on '{feature_branch}', pulling latest changes..."
-                            )
-                            gh._run_command(
-                                ["git", "pull", "origin", feature_branch],
-                                cwd=operator_local_path,
-                            )
-                        else:
-                            print(f"    🔄 Switching to '{feature_branch}' branch...")
-                            # Just checkout to existing local branch (no --track needed)
-                            gh._run_command(
-                                ["git", "checkout", feature_branch],
-                                cwd=operator_local_path,
-                            )
-                            gh._run_command(
-                                ["git", "pull", "origin", feature_branch],
-                                cwd=operator_local_path,
-                            )
-                    except Exception as checkout_error:
+                        print(f"    ✅ Using current branch: {current_branch} (no upstream setup)")
+                        
+                else:
+                    # For standard repo, use feature branch workflow
+                    feature_branch = gh.get_branch_name()
+                    if gh.branch_exists(operator_local_path, feature_branch):
                         print(
-                            f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}"
+                            f"    🔄 Updating feature branch '{feature_branch}' from origin..."
                         )
-                        # Fallback: try to create tracking branch if local doesn't exist
+                        gh._run_command(["git", "fetch", "origin"], cwd=operator_local_path)
+
+                        # Check if we're already on the target branch
                         try:
-                            gh._run_command(
-                                [
-                                    "git",
-                                    "checkout",
-                                    "--track",
-                                    f"origin/{feature_branch}",
-                                ],
-                                cwd=operator_local_path,
+                            current_branch_result = gh._run_command(
+                                ["git", "branch", "--show-current"], cwd=operator_local_path
                             )
-                        except Exception as track_error:
+                            current_branch = current_branch_result.stdout.strip()
+
+                            if current_branch == feature_branch:
+                                print(
+                                    f"    📍 Already on '{feature_branch}', pulling latest changes..."
+                                )
+                                gh._run_command(
+                                    ["git", "pull", "origin", feature_branch],
+                                    cwd=operator_local_path,
+                                )
+                            else:
+                                print(f"    🔄 Switching to '{feature_branch}' branch...")
+                                # Just checkout to existing local branch (no --track needed)
+                                gh._run_command(
+                                    ["git", "checkout", feature_branch],
+                                    cwd=operator_local_path,
+                                )
+                                gh._run_command(
+                                    ["git", "pull", "origin", feature_branch],
+                                    cwd=operator_local_path,
+                                )
+                        except Exception as checkout_error:
                             print(
-                                f"    ❌ Failed to checkout/track branch: {track_error}"
+                                f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}"
                             )
-                            raise
+                            # Fallback: try to create tracking branch if local doesn't exist
+                            try:
+                                gh._run_command(
+                                    [
+                                        "git",
+                                        "checkout",
+                                        "--track",
+                                        f"origin/{feature_branch}",
+                                    ],
+                                    cwd=operator_local_path,
+                                )
+                            except Exception as track_error:
+                                print(
+                                    f"    ❌ Failed to checkout/track branch: {track_error}"
+                                )
+                                raise
+                    else:
+                        print(f"    ℹ️  Feature branch '{feature_branch}' does not exist, staying on current branch")
+                        
             except Exception as e:
-                print(f"    ⚠️  Could not checkout feature branch: {e}")
+                print(f"    ⚠️  Could not update operator repository: {e}")
 
         # Step 2: Parse manifest repositories from get_all_manifests.sh
         try:
@@ -318,31 +444,45 @@ def cmd_clone_forks(args):
             print(f"❌ Error parsing manifest repositories: {e}")
             return 1
 
-        # Get additional repositories from config
-        additional_repos = gh.get_additional_repositories()
-        print(
-            f"📋 Found {len(additional_repos)} additional repositories in configuration"
-        )
-
         if args.dry_run:
             print("\n🔍 DRY RUN - Would clone the following repositories:")
+            if args.allow:
+                print(f"    🎯 Filtering: Only showing '{args.allow}'")
             fork_org = gh.get_fork_org()
 
+            # Apply same filtering logic as in actual processing
+            if args.allow and args.allow != 'opendatahub-operator':
+                filtered_manifest_repos = {name: branch for name, branch in manifest_repos.items() if name == args.allow}
+                filtered_additional_repos = [repo for repo in additional_repos if repo['repo_name'] == args.allow]
+            elif args.allow == 'opendatahub-operator':
+                filtered_manifest_repos = {}
+                filtered_additional_repos = []
+            else:
+                filtered_manifest_repos = manifest_repos
+                filtered_additional_repos = additional_repos
+
             print("  📦 Manifest Dependencies:")
-            for repo_name, base_branch in manifest_repos.items():
-                fork_url = f"{fork_org}/{repo_name}"
-                local_path = gh.src_dir / repo_name
-                status = "exists" if local_path.exists() else "would clone"
-                print(f"    • {fork_url} (base: {base_branch}) - {status}")
+            if filtered_manifest_repos:
+                for repo_name, base_branch in filtered_manifest_repos.items():
+                    fork_url = f"{fork_org}/{repo_name}"
+                    local_path = gh.src_dir / repo_name
+                    status = "exists" if local_path.exists() else "would clone"
+                    print(f"    • {fork_url} (base: {base_branch}) - {status}")
+            else:
+                print("    (no manifest dependencies to process)")
 
             print("\n  ➕ Additional Repositories:")
-            for repo_url in additional_repos:
-                repo_name = repo_url.split("/")[-1]
-                fork_url = f"{fork_org}/{repo_name}"
-                local_path = gh.src_dir / repo_name
-                status = "exists" if local_path.exists() else "would clone"
-                # For additional repos, default branch will be detected at runtime
-                print(f"    • {fork_url} (base: auto-detect) - {status}")
+            if filtered_additional_repos:
+                for repo_info in filtered_additional_repos:
+                    source_repo = repo_info['source_repo']
+                    branch = repo_info['branch']
+                    repo_name = repo_info['repo_name']
+                    local_path = gh.src_dir / repo_name
+                    status = "exists" if local_path.exists() else "would clone"
+                    branch_info = f"branch: {branch}" if branch else "base: auto-detect"
+                    print(f"    • {source_repo} ({branch_info}) - {status}")
+            else:
+                print("    (no additional repositories to process)")
 
             return 0
 
@@ -353,10 +493,24 @@ def cmd_clone_forks(args):
         skipped = 0
 
         # Process manifest repositories
-        print(
-            f"\n📦 Processing manifest dependencies ({len(manifest_repos)} repositories):"
-        )
-        for repo_name, base_branch in manifest_repos.items():
+        if args.allow and args.allow != 'opendatahub-operator':
+            # Filter manifest repos to only the allowed one
+            filtered_manifest_repos = {name: branch for name, branch in manifest_repos.items() if name == args.allow}
+            if filtered_manifest_repos:
+                print(f"\n📦 Processing manifest dependencies (filtered to 1 repository: {args.allow}):")
+            else:
+                print(f"\n📦 No manifest dependencies match '{args.allow}' - skipping manifest processing")
+                filtered_manifest_repos = {}
+        elif args.allow == 'opendatahub-operator':
+            # Skip all manifest repos if only processing operator
+            print(f"\n📦 Skipping manifest dependencies (only processing opendatahub-operator)")
+            filtered_manifest_repos = {}
+        else:
+            # Process all manifest repos
+            print(f"\n📦 Processing manifest dependencies ({len(manifest_repos)} repositories):")
+            filtered_manifest_repos = manifest_repos
+            
+        for repo_name, base_branch in filtered_manifest_repos.items():
             # Skip opendatahub-operator since we already handled it in Step 1
             if repo_name == "opendatahub-operator":
                 print(f"⏭️  Skipping {repo_name} (already processed in Step 1)")
@@ -459,117 +613,116 @@ def cmd_clone_forks(args):
                 print(f"    ❌ Error processing {fork_url}: {e}")
                 results.append({"repo": fork_url, "success": False, "error": str(e)})
 
-        # Process additional repositories
+        # Process additional repositories (excluding any already processed as operator)
         if additional_repos:
-            print(
-                f"\n➕ Processing additional repositories ({len(additional_repos)} repositories):"
-            )
-            for repo_url in additional_repos:
-                repo_name = repo_url.split("/")[-1]
-                fork_url = f"{fork_org}/{repo_name}"
-                local_path = gh.src_dir / repo_name
+            remaining_additional_repos = [
+                repo for repo in additional_repos 
+                if repo['repo_name'] != 'opendatahub-operator' or not operator_from_additional
+            ]
+            
+            # Apply --allow filtering to additional repos
+            if args.allow and args.allow != 'opendatahub-operator':
+                # Filter to only the allowed repo
+                remaining_additional_repos = [
+                    repo for repo in remaining_additional_repos
+                    if repo['repo_name'] == args.allow
+                ]
+                if remaining_additional_repos:
+                    print(f"\n➕ Processing additional repositories (filtered to 1 repository: {args.allow}):")
+                else:
+                    print(f"\n➕ No additional repositories match '{args.allow}' - skipping additional processing")
+            elif args.allow == 'opendatahub-operator':
+                # Skip all additional repos if only processing operator
+                print(f"\n➕ Skipping additional repositories (only processing opendatahub-operator)")
+                remaining_additional_repos = []
+            else:
+                # Show message if operator was skipped
+                if operator_from_additional and len(remaining_additional_repos) < len(additional_repos):
+                    print(f"\n⏭️  Skipping opendatahub-operator from additional repositories (already processed as operator)")
+                
+                if remaining_additional_repos:
+                    print(
+                        f"\n➕ Processing remaining additional repositories ({len(remaining_additional_repos)} repositories):"
+                    )
+            
+            # Process the remaining additional repositories (outside the filtering logic)
+            if remaining_additional_repos:
+                for repo_info in remaining_additional_repos:
+                    source_repo = repo_info['source_repo']
+                    branch = repo_info['branch']
+                    repo_name = repo_info['repo_name']
+                    fork_url = f"{fork_org}/{repo_name}"
+                    local_path = gh.src_dir / repo_name
 
-                # Skip if local checkout exists and --skip-existing is set
-                if local_path.exists() and args.skip_existing:
-                    print(f"⏭️  Skipping {fork_url} (local checkout exists)")
-                    skipped += 1
-                    continue
+                    # Skip if local checkout exists and --skip-existing is set
+                    if local_path.exists() and args.skip_existing:
+                        print(f"⏭️  Skipping {source_repo} (local checkout exists)")
+                        skipped += 1
+                        continue
 
-                try:
-                    print(f"\n📂 Processing {fork_url}...")
-                    processed += 1
+                    try:
+                        print(f"\n📂 Processing {source_repo}...")
+                        if branch:
+                            print(f"    📋 Target branch: {branch}")
+                        processed += 1
 
-                    # Step 3a: Clone fork
-                    print(f"  🔄 Cloning fork...")
-                    result = gh.clone_repository(fork_url)
+                        # Step 3a: Clone directly from source repository
+                        # Additional repos are cloned directly from their source (no forking)
+                        print(f"  🔄 Cloning directly from {source_repo}...")
+                        clone_url = f"https://github.com/{source_repo}"
+                        result = gh.clone_repository(clone_url)
 
-                    if result["cloned"]:
-                        print(f"    ✅ Repository cloned to: {result['local_path']}")
-                    else:
-                        print(
-                            f"    ℹ️  Repository already exists at: {result['local_path']}"
-                        )
+                        if result["cloned"]:
+                            print(f"    ✅ Repository cloned to: {result['local_path']}")
+                        else:
+                            print(
+                                f"    ℹ️  Repository already exists at: {result['local_path']}"
+                            )
 
-                    # Step 3b: Setup upstream and rebase
-                    print(f"  🔄 Setting up upstream and rebasing...")
-                    repo_path = Path(result["local_path"])
-                    upstream_url = f"https://github.com/{repo_url}"
-                    gh.setup_upstream(repo_path, upstream_url)
+                        # Step 3c: Setup repository for additional repos
+                        print(f"  🔄 Setting up repository...")
+                        repo_path = Path(result["local_path"])
 
-                    # Step 3c: Detect default branch and create/checkout feature branch
-                    print(f"  🔄 Setting up feature branch...")
-                    feature_branch = gh.get_branch_name()
-                    default_branch = gh.get_default_branch(repo_path)
-                    print(f"    📋 Detected default branch: {default_branch}")
-
-                    if not gh.branch_exists(repo_path, feature_branch):
-                        print(
-                            f"    🆕 Creating feature branch '{feature_branch}' from '{default_branch}'..."
-                        )
-                        gh.create_branch(repo_path, feature_branch, default_branch)
-                    else:
-                        print(
-                            f"    ✅ Feature branch '{feature_branch}' already exists, updating from origin..."
-                        )
-                        # Fetch latest from origin
-                        gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
-
-                        # Check if we're already on the target branch
-                        try:
+                        # Step 3b: Handle branch setup for additional repos
+                        if branch:
+                            # Specific branch requested - fetch and checkout from origin (already cloned from source)
+                            print(f"  🔄 Setting up specific branch: {branch}")
+                            
+                            try:
+                                # Fetch from origin to get latest branches
+                                gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
+                                
+                                # Try to checkout the branch
+                                gh._run_command(["git", "checkout", branch], cwd=repo_path)
+                                print(f"    ✅ Checked out branch: {branch}")
+                            except Exception as branch_error:
+                                print(f"    ⚠️  Could not checkout branch {branch}: {branch_error}")
+                                current_branch_result = gh._run_command(
+                                    ["git", "branch", "--show-current"], cwd=repo_path
+                                )
+                                current_branch = current_branch_result.stdout.strip()
+                                print(f"    ℹ️  Staying on current branch: {current_branch}")
+                        else:
+                            # No specific branch requested - use current branch
                             current_branch_result = gh._run_command(
                                 ["git", "branch", "--show-current"], cwd=repo_path
                             )
                             current_branch = current_branch_result.stdout.strip()
+                            print(f"  ✅ Using current branch: {current_branch}")
 
-                            if current_branch == feature_branch:
-                                print(
-                                    f"    📍 Already on '{feature_branch}', pulling latest changes..."
-                                )
-                                gh._run_command(
-                                    ["git", "pull", "origin", feature_branch],
-                                    cwd=repo_path,
-                                )
-                            else:
-                                print(
-                                    f"    🔄 Switching to '{feature_branch}' branch..."
-                                )
-                                # Just checkout to existing local branch (no --track needed)
-                                gh._run_command(
-                                    ["git", "checkout", feature_branch], cwd=repo_path
-                                )
-                                gh._run_command(
-                                    ["git", "pull", "origin", feature_branch],
-                                    cwd=repo_path,
-                                )
-                        except Exception as checkout_error:
-                            print(
-                                f"    ⚠️  Checkout failed, trying to create tracking branch: {checkout_error}"
-                            )
-                            # Fallback: try to create tracking branch if local doesn't exist
-                            try:
-                                gh._run_command(
-                                    [
-                                        "git",
-                                        "checkout",
-                                        "--track",
-                                        f"origin/{feature_branch}",
-                                    ],
-                                    cwd=repo_path,
-                                )
-                            except Exception as track_error:
-                                print(
-                                    f"    ❌ Failed to checkout/track branch: {track_error}"
-                                )
-                                raise
+                        print(f"    ✅ Setup complete for {source_repo}")
+                        results.append({"repo": source_repo, "success": True})
 
-                    print(f"    ✅ Setup complete for {fork_url}")
-                    results.append({"repo": fork_url, "success": True})
-
-                except Exception as e:
-                    print(f"    ❌ Error processing {fork_url}: {e}")
-                    results.append(
-                        {"repo": fork_url, "success": False, "error": str(e)}
-                    )
+                    except Exception as e:
+                        print(f"    ❌ Error processing {source_repo}: {e}")
+                        results.append(
+                            {"repo": source_repo, "success": False, "error": str(e)}
+                        )
+            else:
+                if operator_from_additional:
+                    print(f"\n✅ No additional repositories to process (opendatahub-operator already handled)")
+                else:
+                    print(f"\n✅ No additional repositories to process")
 
         # Summary
         successful = sum(1 for r in results if r["success"])
@@ -619,9 +772,17 @@ def cmd_show_config(args):
         if additional_repos:
             print("  ➕ Additional Repositories:")
             for repo in additional_repos:
-                print(
-                    f"    • {repo} → {github_config.get('fork_org', 'N/A')}/{repo.split('/')[-1]}"
-                )
+                if ':' in repo:
+                    source_repo, branch = repo.split(':', 1)
+                    repo_name = source_repo.split('/')[-1]
+                    print(
+                        f"    • {source_repo} → {github_config.get('fork_org', 'N/A')}/{repo_name} (branch: {branch})"
+                    )
+                else:
+                    repo_name = repo.split('/')[-1]
+                    print(
+                        f"    • {repo} → {github_config.get('fork_org', 'N/A')}/{repo_name}"
+                    )
         else:
             print("  ➕ Additional Repositories: None configured")
         print()
@@ -661,7 +822,7 @@ def cmd_fork_all(args):
         gh = GitHubWrapper()
 
         print("🔄 Forking additional repositories...")
-        additional_repos = gh.get_additional_repositories()
+        additional_repos = gh.parse_additional_repositories()
 
         if not additional_repos:
             print("ℹ️  No additional repositories configured in config.yaml")
@@ -675,10 +836,16 @@ def cmd_fork_all(args):
 
         print(f"\n📂 Processing {len(additional_repos)} additional repositories:")
 
-        for repo_url in additional_repos:
+        for repo_info in additional_repos:
+            source_repo = repo_info['source_repo']
+            branch = repo_info['branch']
+            repo_name = repo_info['repo_name']
+            
             try:
-                print(f"  🔄 Forking {repo_url}...")
-                fork_result = gh.fork_repository(repo_url)
+                print(f"  🔄 Forking {source_repo}...")
+                if branch:
+                    print(f"    📋 Target branch: {branch}")
+                fork_result = gh.fork_repository(source_repo)
 
                 # Since fork_repository returns RepoInfo, just show that fork is available
                 print(
@@ -701,11 +868,38 @@ def cmd_fork_all(args):
                             f"    ℹ️  Repository already exists at: {clone_result['local_path']}"
                         )
 
-                results.append({"repo": repo_url, "success": True})
+                    # If a specific branch was specified, checkout that branch
+                    if branch:
+                        print(f"  🔄 Setting up specific branch: {branch}")
+                        repo_path = Path(clone_result['local_path'])
+                        
+                        # Set up upstream remote to the source repository
+                        upstream_url = f"https://github.com/{source_repo}"
+                        gh.setup_upstream(repo_path, upstream_url)
+                        
+                        # Check if the branch exists locally or remotely
+                        try:
+                            # Try to checkout the branch if it exists locally
+                            gh._run_command(["git", "checkout", branch], cwd=repo_path)
+                            print(f"    ✅ Checked out existing local branch: {branch}")
+                        except Exception:
+                            try:
+                                # Try to checkout from upstream
+                                gh._run_command(["git", "fetch", "upstream"], cwd=repo_path)
+                                gh._run_command(
+                                    ["git", "checkout", "-b", branch, f"upstream/{branch}"], 
+                                    cwd=repo_path
+                                )
+                                print(f"    ✅ Created and checked out branch from upstream: {branch}")
+                            except Exception as branch_error:
+                                print(f"    ⚠️  Could not checkout branch {branch}: {branch_error}")
+                                print(f"    ℹ️  Repository remains on default branch")
+
+                results.append({"repo": source_repo, "success": True})
 
             except Exception as e:
-                print(f"    ❌ Error processing {repo_url}: {e}")
-                results.append({"repo": repo_url, "success": False, "error": str(e)})
+                print(f"    ❌ Error processing {source_repo}: {e}")
+                results.append({"repo": source_repo, "success": False, "error": str(e)})
 
         # Summary
         successful = sum(1 for r in results if r["success"])
@@ -1308,6 +1502,8 @@ Examples:
   %(prog)s clone-repo opendatahub-io/odh-dashboard
   %(prog)s clone-forks --dry-run
   %(prog)s clone-forks --skip-existing
+  %(prog)s clone-forks --allow oauth-proxy --dry-run
+  %(prog)s clone-forks --allow opendatahub-operator
 
 Note: This tool can be run from anywhere within the project directory tree.
       It will automatically find config.yaml and .github_token files in the project root.
@@ -1385,6 +1581,11 @@ For build and deployment operations, use the Ansible-based task system:
         "--skip-existing",
         action="store_true",
         help="Skip repositories that already have local checkouts",
+    )
+    clone_forks_parser.add_argument(
+        "--allow",
+        metavar="REPO_NAME",
+        help="Only process the specified repository (e.g., 'oauth-proxy', 'opendatahub-operator'). Useful for testing individual repositories.",
     )
     clone_forks_parser.set_defaults(func=cmd_clone_forks)
 
