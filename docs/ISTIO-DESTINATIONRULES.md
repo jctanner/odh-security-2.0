@@ -695,6 +695,209 @@ The live cluster verification proves this exact flow is operational:
 10. Envoy cluster configured with UpstreamTlsContext
 ```
 
+## Multi-Gateway DestinationRule Scoping
+
+A critical aspect of Istio's DestinationRule architecture is how wildcard rules behave across multiple Envoy proxy types and instances. Each proxy type has different service visibility, which directly impacts DestinationRule application scope.
+
+### Proxy-Specific Service Scoping
+
+The fundamental service scoping logic determines which services each proxy can apply DestinationRules to:
+
+```go
+// pilot/pkg/networking/core/v1alpha3/cluster.go:60-65
+if features.FilterGatewayClusterConfig && proxy.Type == model.Router {
+    services = req.Push.GatewayServices(proxy)  // ← GATEWAY PROXIES
+} else {
+    services = proxy.SidecarScope.Services()    // ← SIDECAR PROXIES  
+}
+```
+
+### Gateway Proxy Scoping
+
+**Gateway proxies (Router type)** have **limited, route-based service visibility**:
+
+- **Service scope:** Only services referenced by HTTPRoute/Gateway configurations
+- **DestinationRule application:** Wildcard `*` rules apply only to services the gateway routes to
+- **Independence:** Each gateway proxy has its own isolated service scope
+
+**Example:**
+```yaml
+# Gateway A routes to: echo-server, odh-dashboard, kube-auth-proxy
+# Gateway B routes to: test-service, api-service
+# 
+# A wildcard DestinationRule will:
+# - Apply to 3 services for Gateway A
+# - Apply to 2 services for Gateway B
+# - Each gateway gets independent cluster configurations
+```
+
+### Sidecar Proxy Scoping
+
+**Sidecar proxies (Sidecar type)** have **full namespace-aware service visibility**:
+
+- **Service scope:** All services visible based on Sidecar configuration and namespace exports
+- **DestinationRule application:** Wildcard `*` rules apply to all services in scope (potentially hundreds)
+- **Namespace awareness:** Respects exportTo and visibility rules
+
+### Standalone Envoy Proxies
+
+**Non-Istio Envoy proxies** are **completely isolated**:
+
+- **Service scope:** None - not managed by Istiod
+- **DestinationRule application:** Not affected by any DestinationRules
+- **Configuration:** Uses static Envoy configuration files
+
+### Practical Multi-Gateway Scenarios
+
+#### Scenario 1: Multiple Gateways, Same Wildcard DestinationRule
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: global-tls-policy
+  namespace: istio-system
+spec:
+  host: "*"
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
+```
+
+**Impact:**
+- **Gateway A** (routes to 5 services) → TLS policy applied to 5 clusters
+- **Gateway B** (routes to 3 services) → TLS policy applied to 3 clusters  
+- **Gateway C** (routes to 10 services) → TLS policy applied to 10 clusters
+- **Sidecar proxies** → TLS policy applied to all visible services
+
+#### Scenario 2: Namespace-Specific DestinationRules
+
+```yaml
+# In production namespace
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: prod-wildcard
+  namespace: production
+spec:
+  host: "*"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+---
+# In development namespace  
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: dev-wildcard
+  namespace: development
+spec:
+  host: "*"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 10
+```
+
+**Resolution Rules:**
+1. **Gateway in production namespace** → Uses `prod-wildcard` rule (100 connections)
+2. **Gateway in development namespace** → Uses `dev-wildcard` rule (10 connections)
+3. **Cross-namespace gateways** → Follows namespace precedence hierarchy
+4. **ExportTo controls** → Can override namespace-based scoping
+
+### DestinationRule Resolution Hierarchy
+
+For each proxy, DestinationRule resolution follows this precedence:
+
+```
+1. Proxy's namespace (local rules)
+   ↓
+2. Service's namespace (service-specific rules)
+   ↓  
+3. Exported rules from service namespace
+   ↓
+4. Exported rules from root namespace (istio-system)
+   ↓
+5. Within each level: Specific host rules override wildcard rules
+```
+
+### Multi-Tenant Implications
+
+This architecture enables powerful multi-tenant scenarios:
+
+#### **Gateway Isolation**
+- **Tenant A Gateway** → Only applies policies to Tenant A services
+- **Tenant B Gateway** → Only applies policies to Tenant B services
+- **Shared Gateway** → Applies policies to all routed services across tenants
+
+#### **Policy Inheritance**
+- **Global policies** (istio-system namespace) → Affect all gateways
+- **Tenant policies** (tenant namespaces) → Override global policies for that tenant
+- **Service-specific policies** → Override both global and tenant policies
+
+#### **Service Mesh Segmentation**
+- **Per-gateway service visibility** prevents policy leakage between gateways
+- **Namespace-based rules** provide tenant-level policy isolation
+- **ExportTo controls** enable fine-grained cross-tenant policy sharing
+
+### Verification Example
+
+Live cluster testing demonstrated this behavior:
+
+```bash
+# Created two gateways:
+odh-gateway-odh-gateway-class-5b6bc7766c-4zpcz      # Routes: echo-server, odh-dashboard  
+test-gateway-test-gateway-class-8965b8496-kfdzl     # Routes: test-service
+
+# Single wildcard DestinationRule in opendatahub namespace:
+spec:
+  host: "*"
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
+
+# Results:
+# - odh-gateway: TLS policy applied to echo-server, odh-dashboard clusters
+# - test-gateway: TLS policy applied to test-service cluster  
+# - Each gateway received independent cluster configurations from istiod
+```
+
+**Proof in Logs:**
+```
+XDS: Incremental Pushing ConnectedEndpoints:2 Version:2025-09-23T21:46:55Z/89
+```
+
+Istiod pushed **different cluster configurations** to each gateway proxy, confirming independent service scoping.
+
+### Performance and Scale Considerations
+
+#### **Gateway Advantages**
+- **Smaller configuration size** → Only clusters for routed services
+- **Faster configuration updates** → Less data to process and transmit
+- **Better resource isolation** → Gateway failures don't affect unrelated services
+
+#### **Sidecar Considerations**  
+- **Larger configuration size** → Clusters for all visible services
+- **More comprehensive policies** → Can affect entire service mesh scope
+- **Higher resource usage** → More memory and CPU for configuration processing
+
+### Best Practices
+
+#### **For Multi-Gateway Deployments**
+1. **Use namespace-specific DestinationRules** for tenant isolation
+2. **Apply global policies in istio-system namespace** for mesh-wide defaults
+3. **Monitor gateway service scopes** to understand policy impact
+4. **Test policy changes** on individual gateways before mesh-wide rollout
+
+#### **For Large Scale Deployments**
+1. **Prefer specific host DestinationRules** over wildcards where possible
+2. **Use exportTo selectively** to limit rule propagation
+3. **Monitor XDS push sizes** and configuration update frequencies
+4. **Consider gateway consolidation** vs. isolation trade-offs
+
 ## Verification Conclusions
 
 ### 1. **Architecture Confirmation**
