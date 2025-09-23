@@ -16,6 +16,7 @@ spec:
       labels:
         app: echo-server
     spec:
+      serviceAccount: echo-server
       containers:
       - name: echo-server
         image: registry.tannerjc.net/echo-server:latest
@@ -27,6 +28,35 @@ spec:
         #securityContext:
         #  runAsNonRoot: true
         #  runAsUser: 1000740000
+      - name: kube-rbac-proxy
+        image: registry.redhat.io/openshift4/ose-kube-rbac-proxy:latest
+        ports:
+        - containerPort: 8443
+          name: https
+        args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://localhost:8080
+        - --config-file=/etc/kube-rbac-proxy/config.yaml
+        - --tls-cert-file=/etc/tls/private/tls.crt
+        - --tls-private-key-file=/etc/tls/private/tls.key
+        - --auth-header-fields-enabled=true
+        - --auth-header-user-field-name=X-Auth-Request-User
+        - --auth-header-groups-field-name=X-Auth-Request-Groups
+        - --v=2
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: echo-server-tls
+          readOnly: true
+        - mountPath: /etc/kube-rbac-proxy
+          name: rbac-config
+          readOnly: true
+      volumes:
+      - name: echo-server-tls
+        secret:
+          secretName: echo-server-tls
+      - name: rbac-config
+        configMap:
+          name: echo-server-rbac-config
 ---
 apiVersion: v1
 kind: Service
@@ -35,6 +65,8 @@ metadata:
   namespace: opendatahub
   labels:
     app: echo-server
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: echo-server-tls
 spec:
   selector:
     app: echo-server
@@ -43,14 +75,67 @@ spec:
     port: 8080
     targetPort: 8080
     protocol: TCP
+  - name: https
+    port: 8443
+    targetPort: 8443
+    protocol: TCP
   type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: echo-server-rbac-config
+  namespace: opendatahub
+  labels:
+    app: echo-server
+data:
+  config.yaml: |
+    authorization:
+      resourceAttributes:
+        namespace: ""
+        apiVersion: v1
+        resource: projects
+        verb: list
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: echo-server
+  namespace: opendatahub
+  labels:
+    app: echo-server
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: echo-server-authz
+  labels:
+    app: echo-server
+rules:
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: echo-server-authz
+  labels:
+    app: echo-server
+subjects:
+- kind: ServiceAccount
+  name: echo-server
+  namespace: opendatahub
+roleRef:
+  kind: ClusterRole
+  name: echo-server-authz
+  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: echo-server-route
   namespace: opendatahub
-  #namespace: openshift-ingress
 spec:
   parentRefs:
   - name: odh-gateway
@@ -62,4 +147,22 @@ spec:
         value: /echo
     backendRefs:
     - name: echo-server
-      port: 8080
+      port: 8443
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: echo-server
+  namespace: opendatahub
+spec:
+  host: echo-server.opendatahub.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
+  portLevelSettings:
+  - port:
+      number: 8443
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
