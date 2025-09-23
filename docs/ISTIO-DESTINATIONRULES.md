@@ -21,7 +21,7 @@ flowchart TD
     ENVOY[Envoy Proxy<br/>Requests CDS] --> |XDS Request| ISTIOD
     
     %% Service Processing Loop
-    ISTIOD --> BUILD[BuildClusters Entry Point<br/>proxy.SidecarScope.Services()]
+    ISTIOD --> BUILD[BuildClusters Entry Point<br/>Get proxy services]
     BUILD --> OUTBOUND[buildOutboundClusters<br/>Iterate ALL services]
     
     %% Per-Service Processing
@@ -35,7 +35,7 @@ flowchart TD
     %% Resolution Logic
     RESOLVE --> MATCH[MostSpecificHostMatch<br/>Check specific AND wildcard maps]
     MATCH --> |Found specific| SPECIFIC_MATCH[Use specific DestinationRule]
-    MATCH --> |No specific, check wildcard| WILDCARD_MATCH[mostSpecificHostWildcardMatch<br/>strings.HasSuffix matching]
+    MATCH --> |No specific, check wildcard| WILDCARD_MATCH[mostSpecificHostWildcardMatch<br/>Suffix matching logic]
     
     %% Policy Application
     SPECIFIC_MATCH --> MERGE[MergeTrafficPolicy<br/>Merge destination + subset + port policies]
