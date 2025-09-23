@@ -11,7 +11,7 @@ Istio's control plane (Istiod) processes DestinationRule resources to configure 
 - How wildcard hosts (`*`) are handled versus specific service FQDNs
 - Call hierarchy proving Istiod applies `*` DestinationRules to all clusters when building CDS
 
-## Key Data Structures
+## Data Structures
 
 ### consolidatedDestRules
 ```go
@@ -28,7 +28,7 @@ type consolidatedDestRules struct {
 }
 ```
 
-**Key Point:** Istio maintains **separate data structures** for specific and wildcard DestinationRules, ensuring both are evaluated during cluster generation.
+**Important:** Istio maintains **separate data structures** for specific and wildcard DestinationRules, ensuring both are evaluated during cluster generation.
 
 ### destinationRuleIndex
 ```go
@@ -159,7 +159,7 @@ func (cb *ClusterBuilder) applyDestinationRule(mc *clusterWrapper, clusterMode C
 }
 ```
 
-**Key Points:**
+**Notable Features:**
 - Merges port-level traffic policies using `util.MergeTrafficPolicy()`
 - Applies policies to both default clusters and subset clusters
 - Handles TLS, load balancing, connection pool, and outlier detection settings
@@ -346,7 +346,7 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(cb *ClusterBuilder, 
     services []*model.Service,
 ) ([]*discovery.Resource, cacheStats) {
     resources := make([]*discovery.Resource, 0)
-    efKeys := cp.efw.KeysApplyingTo(networking.EnvoyFilter_CLUSTER)
+    envoyFilterIDs := cp.efw.KeysApplyingTo(networking.EnvoyFilter_CLUSTER)
     hit, miss := 0, 0
     for _, service := range services {
         if service.Resolution == model.Alias {
@@ -365,7 +365,7 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(cb *ClusterBuilder, 
                 continue
             }
 
-            // *** KEY POINT: Apply DestinationRule to EVERY cluster ***
+            // *** CRITICAL: Apply DestinationRule to EVERY cluster ***
             subsetClusters := cb.applyDestinationRule(defaultCluster, model.DefaultClusterMode, service, port,
                 clusterKey.endpointBuilder, clusterKey.destinationRule.GetRule(), clusterKey.serviceAccounts)
         }
@@ -415,7 +415,7 @@ This calls the resolution chain:
 11. Process repeats for EVERY service in the mesh
 ```
 
-## Key Architectural Insights
+## Architectural Insights
 
 ### 1. **Separation of Wildcard and Specific Rules**
 - Istio maintains separate data structures (`specificDestRules` vs `wildcardDestRules`)
@@ -486,7 +486,7 @@ opendatahub   echo-server     *               6h30m
 opendatahub   odh-dashboard   odh-dashboard   23h
 ```
 
-**Key Finding:** The wildcard DestinationRule (`HOST: *`) is actively deployed, exactly as documented.
+**Finding:** The wildcard DestinationRule (`HOST: *`) is actively deployed, exactly as documented.
 
 ### DestinationRule Configuration Analysis
 
@@ -538,7 +538,7 @@ oc port-forward -n openshift-ingress svc/istiod-openshift-gateway 15014:15014 &
 oc exec -n openshift-ingress istiod-openshift-gateway-7cd77c7ffd-9cxs7 -- /usr/local/bin/pilot-discovery request GET /debug/configz
 ```
 
-**Key Output Sections:**
+**Relevant Output Sections:**
 ```json
 {
   "kind": "DestinationRule",
@@ -629,7 +629,7 @@ The live cluster verification proves this exact flow is operational:
 10. Envoy cluster configured with UpstreamTlsContext
 ```
 
-## Key Verification Conclusions
+## Verification Conclusions
 
 ### 1. **Architecture Confirmation**
 - ✅ **Istiod control plane active** with continuous CDS generation
