@@ -2,6 +2,72 @@
 
 This document analyzes how Istio processes DestinationRule resources and merges them into Envoy cluster configuration during CDS (Cluster Discovery Service) generation.
 
+## Architecture Flow Diagram
+
+```mermaid
+flowchart TD
+    %% Input Layer
+    DR[DestinationRule YAML<br/>host: example.com OR *<br/>trafficPolicy: TLS, LB, etc.] --> K8S[Kubernetes API Server]
+    
+    %% Istio Control Plane Processing
+    K8S --> |Watch/List| ISTIOD[Istiod Control Plane<br/>pilot-discovery process]
+    
+    %% Indexing Phase
+    ISTIOD --> INDEX{DestinationRule Indexing}
+    INDEX --> |host: *.domain.com<br/>host: *| WILDCARD[wildcardDestRules<br/>map[host.Name][]*ConsolidatedDestRule]
+    INDEX --> |host: service.ns.svc| SPECIFIC[specificDestRules<br/>map[host.Name][]*ConsolidatedDestRule]
+    
+    %% CDS Generation Trigger
+    ENVOY[Envoy Proxy<br/>Requests CDS] --> |XDS Request| ISTIOD
+    
+    %% Service Processing Loop
+    ISTIOD --> BUILD[BuildClusters Entry Point<br/>proxy.SidecarScope.Services()]
+    BUILD --> OUTBOUND[buildOutboundClusters<br/>Iterate ALL services]
+    
+    %% Per-Service Processing
+    OUTBOUND --> SVCLOOP{For each Service<br/>For each Port}
+    SVCLOOP --> CREATE[buildCluster<br/>Create Envoy cluster config]
+    
+    %% DestinationRule Application
+    CREATE --> APPLY[applyDestinationRule<br/>Apply policies to cluster]
+    APPLY --> RESOLVE[SidecarScope.DestinationRule<br/>Resolve DR for service hostname]
+    
+    %% Resolution Logic
+    RESOLVE --> MATCH[MostSpecificHostMatch<br/>Check specific AND wildcard maps]
+    MATCH --> |Found specific| SPECIFIC_MATCH[Use specific DestinationRule]
+    MATCH --> |No specific, check wildcard| WILDCARD_MATCH[mostSpecificHostWildcardMatch<br/>strings.HasSuffix matching]
+    
+    %% Policy Application
+    SPECIFIC_MATCH --> MERGE[MergeTrafficPolicy<br/>Merge destination + subset + port policies]
+    WILDCARD_MATCH --> MERGE
+    MERGE --> POLICIES[applyTrafficPolicy<br/>Apply TLS, LB, Connection Pool, etc.]
+    
+    %% Envoy Configuration Generation
+    POLICIES --> CLUSTER[Envoy Cluster Config<br/>transport_socket: UpstreamTlsContext<br/>lb_policy: ROUND_ROBIN, etc.]
+    CLUSTER --> |Add to response| CDS_RESP[CDS Response<br/>clusters: [...]]
+    
+    %% Continue Loop
+    SVCLOOP --> |Next Service/Port| SVCLOOP
+    SVCLOOP --> |All processed| CDS_RESP
+    
+    %% Final Delivery
+    CDS_RESP --> |XDS Response| ENVOY
+    ENVOY --> |Configure clusters| TRAFFIC[Route Traffic<br/>with applied policies]
+    
+    %% Styling
+    classDef input fill:#e1f5fe
+    classDef istio fill:#fff3e0  
+    classDef envoy fill:#f3e5f5
+    classDef process fill:#e8f5e8
+    classDef decision fill:#fff8e1
+    
+    class DR,K8S input
+    class ISTIOD,INDEX,WILDCARD,SPECIFIC,BUILD,OUTBOUND,APPLY,RESOLVE,MATCH,MERGE,POLICIES istio
+    class ENVOY,CLUSTER,CDS_RESP,TRAFFIC envoy
+    class CREATE,SVCLOOP process
+    class SPECIFIC_MATCH,WILDCARD_MATCH decision
+```
+
 ## Overview
 
 Istio's control plane (Istiod) processes DestinationRule resources to configure traffic policies on Envoy clusters. This analysis focuses on:
