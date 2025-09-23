@@ -148,21 +148,4 @@ spec:
     backendRefs:
     - name: echo-server
       port: 8443
----
-apiVersion: networking.istio.io/v1beta1
-kind: DestinationRule
-metadata:
-  name: echo-server
-  namespace: opendatahub
-spec:
-  host: echo-server.opendatahub.svc.cluster.local
-  trafficPolicy:
-    tls:
-      mode: SIMPLE
-      insecureSkipVerify: true
-  portLevelSettings:
-  - port:
-      number: 8443
-    tls:
-      mode: SIMPLE
-      insecureSkipVerify: true
+

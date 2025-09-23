@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: odh-tls-rule
+  namespace: opendatahub
+spec:
+  host: '*'
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
+  portLevelSettings:
+  - port:
+      number: 8443
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
