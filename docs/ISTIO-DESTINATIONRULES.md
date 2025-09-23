@@ -14,8 +14,8 @@ flowchart TD
     
     %% Indexing Phase
     ISTIOD --> INDEX{DestinationRule Indexing}
-    INDEX --> |host: *.domain.com<br/>host: *| WILDCARD[wildcardDestRules<br/>map[host.Name][]*ConsolidatedDestRule]
-    INDEX --> |host: service.ns.svc| SPECIFIC[specificDestRules<br/>map[host.Name][]*ConsolidatedDestRule]
+    INDEX --> |host: *.domain.com<br/>host: *| WILDCARD[wildcardDestRules<br/>Map: hostname to rules]
+    INDEX --> |host: service.ns.svc| SPECIFIC[specificDestRules<br/>Map: hostname to rules]
     
     %% CDS Generation Trigger
     ENVOY[Envoy Proxy<br/>Requests CDS] --> |XDS Request| ISTIOD
@@ -44,7 +44,7 @@ flowchart TD
     
     %% Envoy Configuration Generation
     POLICIES --> CLUSTER[Envoy Cluster Config<br/>transport_socket: UpstreamTlsContext<br/>lb_policy: ROUND_ROBIN, etc.]
-    CLUSTER --> |Add to response| CDS_RESP[CDS Response<br/>clusters: [...]]
+    CLUSTER --> |Add to response| CDS_RESP[CDS Response<br/>clusters: cluster configs]
     
     %% Continue Loop
     SVCLOOP --> |Next Service/Port| SVCLOOP
