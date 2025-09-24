@@ -1,40 +1,111 @@
 - debug: var=build_dependencies
 
-- block:
-    - name: Build odh-dashboard image
-      block:
-        - set_fact:
-            dashboard_image_spec: "{{ registry_url + '/' + registry_namespace + '/odh-dashboard:' + registry_tag }}"
+- name: Create temporary directory for custom image environment variables
+  file:
+    path: "{{ project_root }}/.tmp/custom-images.d"
+    state: directory
 
-        - name: Build odh-dashboard container image
-          live_shell:
-            cmd: "podman build -t odh-dashboard:latest -f Dockerfile ."
-            chdir: "{{ project_root }}/src/odh-dashboard"
-          register: dashboard_build_result
 
-        - name: Display dashboard build results
-          debug:
-            msg: "Dashboard build completed with return code: {{ dashboard_build_result.rc }}"
-          when: dashboard_build_result is defined
+- name: Build odh-dashboard image
+  when: "'odh-dashboard' in build_dependencies"
+  block:
+    - set_fact:
+        dashboard_image_spec: "{{ registry_url + '/' + registry_namespace + '/odh-dashboard:' + registry_tag }}"
 
-        - name: Tag odh-dashboard image for registry
-          live_shell:
-            cmd: "podman tag odh-dashboard:latest {{ dashboard_image_spec }}"
+    - name: Build odh-dashboard container image
+      live_shell:
+        cmd: "podman build -t odh-dashboard:latest -f Dockerfile ."
+        chdir: "{{ project_root }}/src/odh-dashboard"
+      register: dashboard_build_result
 
-        - name: Push odh-dashboard image to registry
-          live_shell:
-            cmd: "podman push {{ dashboard_image_spec }}"
+    - name: Display dashboard build results
+      debug:
+        msg: "Dashboard build completed with return code: {{ dashboard_build_result.rc }}"
+      when: dashboard_build_result is defined
 
-        - name: Check if params.env file exists
-          stat:
-            path: "{{ project_root }}/src/odh-dashboard/manifests/odh/params.env"
-          register: params_file_stat
+    - name: Tag odh-dashboard image for registry
+      live_shell:
+        cmd: "podman tag odh-dashboard:latest {{ dashboard_image_spec }}"
 
-        - name: Update odh dashboard image spec in params.env
-          lineinfile:
-            path: "{{ project_root }}/src/odh-dashboard/manifests/odh/params.env"
-            regexp: '^odh-dashboard-image='
-            line: "odh-dashboard-image={{ dashboard_image_spec }}"
-          when: params_file_stat.stat.exists
+    - name: Push odh-dashboard image to registry
+      live_shell:
+        cmd: "podman push {{ dashboard_image_spec }}"
 
-      when: "'odh-dashboard' in build_dependencies"
+    - name: Write dashboard env var to temp file
+      copy:
+        dest: "{{ project_root }}/.tmp/custom-images.d/odh-dashboard.env"
+        content: "RELATED_IMAGE_ODH_DASHBOARD_IMAGE={{ dashboard_image_spec }}"
+
+- name: Build odh-notebook-controller image
+  when: "'odh-notebook-controller' in build_dependencies"
+  block:
+    - set_fact:
+        notebook_controller_image_spec: "{{ registry_url + '/' + registry_namespace + '/odh-notebook-controller:' + registry_tag }}"
+
+    - name: Build odh-notebook-controller container image
+      live_shell:
+        cmd: "podman build --platform linux/amd64 -t odh-notebook-controller:latest -f odh-notebook-controller/Dockerfile ."
+        chdir: "{{ project_root }}/src/kubeflow/components"
+      register: notebook_controller_build_result
+
+    - name: Display notebook-controller build results
+      debug:
+        msg: "Notebook controller build completed with return code: {{ notebook_controller_build_result.rc }}"
+      when: notebook_controller_build_result is defined
+
+    - name: Tag odh-notebook-controller image for registry
+      live_shell:
+        cmd: "podman tag odh-notebook-controller:latest {{ notebook_controller_image_spec }}"
+
+    - name: Push odh-notebook-controller image to registry
+      live_shell:
+        cmd: "podman push {{ notebook_controller_image_spec }}"
+
+    - name: Write notebook-controller env var to temp file
+      copy:
+        dest: "{{ project_root }}/.tmp/custom-images.d/odh-notebook-controller.env"
+        content: "RELATED_IMAGE_ODH_NOTEBOOK_CONTROLLER_IMAGE={{ notebook_controller_image_spec }}"
+
+# General-purpose custom image injection for any component
+- name: Find custom image environment files
+  find:
+    paths: "{{ project_root }}/.tmp/custom-images.d"
+    patterns: "*.env"
+  register: custom_env_files
+
+- name: Read custom image environment variables from files
+  set_fact:
+    custom_env_vars: |
+      {%- set env_vars = [] -%}
+      {%- for file_result in custom_env_files.files -%}
+        {%- set file_content = lookup('file', file_result.path) -%}
+        {%- for line in file_content.split('\n') if line.strip() and '=' in line -%}
+          {%- set key_value = line.split('=', 1) -%}
+          {%- set _ = env_vars.append({'name': key_value[0], 'value': key_value[1]}) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ env_vars }}
+
+- name: Debug final custom environment variables
+  debug:
+    msg: |
+      Custom env vars: {{ custom_env_vars | default([]) }}
+      Count: {{ custom_env_vars | default([]) | length }}
+
+- name: Create consolidated custom images patch
+  template:
+    src: "{{ project_root }}/templates/custom-images-patch.yaml.j2"
+    dest: "{{ project_root }}/src/opendatahub-operator/config/default/custom-images-patch.yaml"
+  when: custom_env_vars is defined and custom_env_vars | length > 0
+
+- name: Add custom images patch to kustomization
+  lineinfile:
+    path: "{{ project_root }}/src/opendatahub-operator/config/default/kustomization.yaml"
+    insertafter: '^- path: manager_webhook_patch.yaml'
+    line: "- path: custom-images-patch.yaml"
+  when: custom_env_vars is defined and custom_env_vars | length > 0
+
+- name: Clean up temporary custom images directory
+  file:
+    path: "{{ project_root }}/.tmp/custom-images.d"
+    state: absent

@@ -52,7 +52,7 @@ build:
 
   build_dependencies:
     - odh-dashboard
-    # - notebooks
+    - odh-notebook-controller
 
 # Migration settings
 migration:
