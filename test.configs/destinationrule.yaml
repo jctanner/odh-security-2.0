@@ -2,7 +2,8 @@ apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
   name: odh-tls-rule
-  namespace: opendatahub
+  #namespace: opendatahub
+  namespace: openshift-ingress
 spec:
   host: '*'
   trafficPolicy:
