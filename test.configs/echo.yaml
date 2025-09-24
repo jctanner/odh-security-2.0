@@ -149,6 +149,32 @@ spec:
     - name: echo-server
       port: 8443
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: echo-server-tokenreview
+  labels:
+    app: echo-server
+rules:
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: echo-server-tokenreview
+  labels:
+    app: echo-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: echo-server-tokenreview
+subjects:
+- kind: ServiceAccount
+  name: echo-server
+  namespace: opendatahub
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
