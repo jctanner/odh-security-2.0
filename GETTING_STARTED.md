@@ -17,11 +17,19 @@ pip install -r requirements.txt
 echo $TOKEN > .github_token
 ```
 
+## Change settings in config.yaml
+
+Take a look at config.yaml and make yourself familiar with the structure. Pay close attention to the `github` section as that defines where all your forks live and what branches to use.
+
+The `additional_repositories` key allows you to define additonal repos to clone that aren't defined by the operator's `get_all_manifests.sh` script. This also allows you to override where specific repos (like the operator) would get cloned from, so if you wanted to use the upstream repo or someone else's fork, you could define that here.
+
+**IMPORTANT** if you plan to build and deploy images, this tool is going to use jtanner's personal/public container registry and will inevitably collide with other peoples image, if you do not change the value for the `namespace` field in the `registry` section of the config. It's probably simpler to simply change it from `odh-security-2.0` to your username.
+
 ## Get all the source repos cloned to your machine
 
 ### create all the clones
 
-This will clone every repo necessary to make a complete dev stack for ODH. If the repo doesn't exist in the org specified by config.yaml, it will be forked from the repo as defined in get_all_manifests.sh
+This will clone every repo necessary to make a complete dev stack for ODH. If the repo doesn't exist in the org specified by config.yaml, it will be forked from the repo as defined in `get_all_manifests.sh`
 
 ```
 ./tool.py clone-forks
@@ -29,7 +37,7 @@ This will clone every repo necessary to make a complete dev stack for ODH. If th
 
 ### copy manifests into the operator repo
 
-This is an important step to follow if you want to use the manifests from your adjacent component checkouts. If you skip this, you'll end up with the default manifests as defined by the get_manifests.sh script.
+This is an important step to follow if you want to use the manifests from your adjacent component checkouts. If you skip this, you'll end up with the default manifests as defined by the `get_all_manifests.sh` script.
 
 ```
 ./tool.py workflow --name=manifests --exec
