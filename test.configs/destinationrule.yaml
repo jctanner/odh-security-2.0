@@ -1,4 +1,4 @@
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
   name: odh-tls-rule
@@ -6,12 +6,16 @@ metadata:
 spec:
   host: '*'
   trafficPolicy:
-    tls:
-      mode: SIMPLE
-      insecureSkipVerify: true
-  portLevelSettings:
-  - port:
-      number: 8443
-    tls:
-      mode: SIMPLE
-      insecureSkipVerify: true
+    # Port-specific TLS settings - only apply TLS to HTTPS ports
+    portLevelSettings:
+    - port:
+        number: 8443  # HTTPS port with serving certs
+      tls:
+        mode: SIMPLE
+        insecureSkipVerify: true
+    - port:
+        number: 443   # Standard HTTPS port
+      tls:
+        mode: SIMPLE
+        insecureSkipVerify: true
+    # Ports 8080, 80 (HTTP) will remain plain HTTP
