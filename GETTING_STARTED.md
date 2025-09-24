@@ -23,7 +23,7 @@ Take a look at config.yaml and make yourself familiar with the structure. Pay cl
 
 The `additional_repositories` key allows you to define additonal repos to clone that aren't defined by the operator's `get_all_manifests.sh` script. This also allows you to override where specific repos (like the operator) would get cloned from, so if you wanted to use the upstream repo or someone else's fork, you could define that here.
 
-**IMPORTANT** if you plan to build and deploy images, this tool is going to use jtanner's personal/public container registry and will inevitably collide with other peoples image, if you do not change the value for the `namespace` field in the `registry` section of the config. It's probably simpler to simply change it from `odh-security-2.0` to your username.
+**IMPORTANT** if you plan to build and deploy images, this tool is going to use jtanner's personal/public container registry and will inevitably collide with other peoples image, if you do not change the value for the `namespace` field in the `registry` section of the config. It's probably easiest to simply change it from `odh-security-2.0` to your username.
 
 ## Get all the source repos cloned to your machine
 
