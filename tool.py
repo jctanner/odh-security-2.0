@@ -1457,6 +1457,7 @@ def cmd_workflow(args):
 
             except Exception as e:
                 print(f"❌ Error executing task '{args.name}': {e}")
+                import epdb; epdb.st()
                 return 1
 
         # If we get here, no valid operation was specified

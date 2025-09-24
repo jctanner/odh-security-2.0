@@ -1,3 +1,4 @@
+import copy
 import yaml
 import os
 import subprocess
@@ -99,6 +100,9 @@ class AnsibleEngine:
                     "build_manifests_only": build_config.get("manifests_only"),
                 }
             )
+
+            if "build_dependencies" in build_config:
+                variables["build_dependencies"] = copy.deepcopy(build_config["build_dependencies"])
 
         # Deployment variables
         deployment_config = self.config.get("deployment", {})

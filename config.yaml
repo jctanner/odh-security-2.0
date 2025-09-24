@@ -50,6 +50,10 @@ build:
   # Only fetch manifests, do not build binary or image
   manifests_only: false
 
+  build_dependencies:
+    - odh-dashboard
+    # - notebooks
+
 # Migration settings
 migration:
   # Whether to automatically create branches after forking

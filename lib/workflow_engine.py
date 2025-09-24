@@ -45,6 +45,7 @@ class WorkflowEngine:
         self.workflows_dir = os.path.join(self.project_root, "workflows")
         self.config_file = os.path.join(self.project_root, "config.yaml")
         self.config = self._load_config()
+        import epdb; epdb.st()
 
     def _find_project_root(self) -> str:
         """Find the project root directory by looking for config.yaml"""
@@ -111,6 +112,8 @@ class WorkflowEngine:
         variables["PROJECT_ROOT"] = self.project_root
         variables["LOCAL_CHECKOUTS_DIR"] = os.path.join(self.project_root, "src")
         variables["WORKFLOWS_DIR"] = self.workflows_dir
+
+        import epdb; epdb.st()
 
         return variables
 
@@ -228,6 +231,7 @@ class WorkflowEngine:
         Returns:
             True if all steps succeeded, False otherwise
         """
+        import epdb; epdb.st()
         try:
             workflow = self.load_workflow(workflow_name)
             return self._execute_workflow_definition(workflow, variables)
