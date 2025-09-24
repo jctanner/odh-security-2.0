@@ -58,7 +58,10 @@ make run-nowebhook
 
 ## OPTION B: make an operator image and deploy it
 
+**NOTE**: this currently only builds & deploys the opendatahub-operator. Building the component images and injecting their uirs into the opendatahub-operator's manifests is a TBD. In the future this will work more like konflux in that it should build all dependencies first, then build the odh operator last to include all the deps.
+
 ### build the image
+
 ```
 ./tool.py workflow --name=image_build --exec
 ```
