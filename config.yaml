@@ -16,7 +16,7 @@ github:
 # These are repositories outside the manifest dependencies that you want to work with
 # Format: "original_org/repo_name" - will be forked to your fork_org
 additional_repositories:
-  - "resoluteCoder/opendatahub-operator:auth-proxy-envoy"
+  # - "resoluteCoder/opendatahub-operator:auth-proxy-envoy"
   - "openshift/oauth-proxy"
   - "opendatahub-io/kube-auth-proxy"
   - "openshift/kube-rbac-proxy"
