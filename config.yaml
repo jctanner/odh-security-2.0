@@ -19,6 +19,7 @@ additional_repositories:
   - "resoluteCoder/opendatahub-operator:auth-proxy-envoy"
   - "openshift/oauth-proxy"
   - "opendatahub-io/kube-auth-proxy"
+  - "openshift/kube-rbac-proxy"
 
 # Container Registry Configuration
 registry:
@@ -95,8 +96,8 @@ deployment:
       components:
         # codeflare:
         #   managementState: "Managed"
-        dashboard:
-          managementState: "Managed"
+        #dashboard:
+        #  managementState: "Managed"
         # datasciencepipelines:
         #   managementState: "Managed"
         # kserve:

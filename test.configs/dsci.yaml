@@ -4,8 +4,6 @@ metadata:
   name: default-dsci
 spec:
   applicationsNamespace: opendatahub
-  networking:
-    mode: 'gateway-api'
   serviceMesh:
     managementState: Removed
   trustedCABundle:

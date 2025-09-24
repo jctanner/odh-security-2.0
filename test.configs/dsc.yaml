@@ -8,3 +8,11 @@ spec:
       managementState: Managed
     workbenches:
       managementState: Managed
+    datasciencepipelines:
+      managementState: Managed
+    kserve:
+      defaultDeploymentMode: RawDeployment
+      managementState: Managed
+      serving:
+        managementState: Removed
+        name: knative-serving
