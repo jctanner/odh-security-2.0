@@ -55,8 +55,3 @@ Wait for the status to be "ready" ...
 ```
 watch oc get dsc
 ```
-
-### setup the route + oauth-proxy in another terminal
-```
-./create_oauth_setup.sh
-```
