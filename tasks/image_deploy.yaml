@@ -1,0 +1,29 @@
+---
+# OpenDataHub deployment task - deploys operator, DSCI, and DSC
+# Run pre-deploy.yml first to set up namespaces and dependencies
+
+- set_fact:
+    image_spec: "{{ registry_url + '/' + registry_namespace + '/opendatahub-operator:' + registry_tag }}"
+
+- name: "Check if operator already deployed"
+  live_shell:
+    cmd: "kubectl get deployment opendatahub-operator-controller-manager -n opendatahub-operator-system"
+  register: check_operator_result
+  failed_when: false
+
+- name: "Display operator check result"
+  debug:
+    msg: "Operator deployment status: {{ 'EXISTS' if check_operator_result.rc == 0 else 'NOT FOUND' }}"
+
+- name: "Deploy operator"
+  live_shell:
+    cmd: "make deploy"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+    environment:
+      IMG: "{{ image_spec }}"
+  register: deploy_operator_result
+
+- name: "Wait for operator to be ready"
+  live_shell:
+    cmd: "kubectl wait --for=condition=Available deployment/opendatahub-operator-controller-manager -n opendatahub-operator-system --timeout={{ wait_timeout }}s"
+  register: wait_operator_result

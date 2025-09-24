@@ -2,10 +2,8 @@
 # Combined workflow: Build operator image, push to registry, and deploy to cluster
 # This combines build.yml, push.yml, pre-deploy.yml, and deploy.yml workflows
 
-- include_tasks: build.yml
+- include_tasks: image_build.yml
 
-- include_tasks: push.yml
+- include_tasks: image_push.yml
 
-- include_tasks: pre-deploy.yml
-
-- include_tasks: deploy.yml 
+- include_tasks: image_deploy.yml 

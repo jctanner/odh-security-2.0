@@ -1,0 +1,17 @@
+# Build OpenDataHub Operator Tasks
+# Ansible task file for building the OpenDataHub operator image from local checkouts
+
+- set_fact:
+    image_spec: "{{ registry_url + '/' + registry_namespace + '/opendatahub-operator:' + registry_tag }}"
+
+- name: "Build operator image"
+  live_shell:
+    #cmd: "USE_LOCAL=true make image-build"
+    cmd: "make image-build USE_LOCAL=true IMG={{ image_spec }}"
+    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
+  register: build_result
+
+- name: "Display build results"
+  debug:
+    msg: "Build completed with return code: {{ build_result.rc }}"
+  when: build_result is defined 

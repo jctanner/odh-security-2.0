@@ -2,29 +2,6 @@
 # OpenDataHub deployment task - deploys operator, DSCI, and DSC
 # Run pre-deploy.yml first to set up namespaces and dependencies
 
-- name: "Check if operator already deployed"
-  live_shell:
-    cmd: "kubectl get deployment opendatahub-operator-controller-manager -n opendatahub-operator-system"
-  register: check_operator_result
-  failed_when: false
-
-- name: "Display operator check result"
-  debug:
-    msg: "Operator deployment status: {{ 'EXISTS' if check_operator_result.rc == 0 else 'NOT FOUND' }}"
-
-- name: "Deploy operator"
-  live_shell:
-    cmd: "make deploy"
-    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
-    environment:
-      IMG: "{{ registry_url }}/{{ registry_namespace }}/odh-operator:{{ registry_tag }}"
-  register: deploy_operator_result
-
-- name: "Wait for operator to be ready"
-  live_shell:
-    cmd: "kubectl wait --for=condition=Available deployment/opendatahub-operator-controller-manager -n opendatahub-operator-system --timeout={{ wait_timeout }}s"
-  register: wait_operator_result
-
 - name: "Create DSCI configuration file"
   copy:
     content: |
@@ -48,17 +25,10 @@
     cmd: "kubectl apply -f /tmp/dsci-config.yaml -n {{ application_namespace }}"
   register: deploy_dsci_result
 
-# WORKAROUND!!!
-#- name: "Apply updated RBAC permissions"
-#  live_shell:
-#    cmd: "kustomize build config/default | kubectl apply -f -"
-#    chdir: "{{ local_checkouts_dir }}/opendatahub-operator"
-#  register: apply_rbac_result
-
 # WORKAROUND - we need to fix this permanently with more fine grain perms
-- name: "WORKAROUND: fix permissions"
-  live_shell:
-    cmd: oc adm policy add-cluster-role-to-user cluster-admin -z opendatahub-operator-controller-manager -n opendatahub-operator-system
+#- name: "WORKAROUND: fix permissions"
+#  live_shell:
+#    cmd: oc adm policy add-cluster-role-to-user cluster-admin -z opendatahub-operator-controller-manager -n opendatahub-operator-system
 
 - name: "Wait for DSCI to be ready"
   live_shell:
