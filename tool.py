@@ -202,7 +202,7 @@ def cmd_clone_forks(args):
                 operator_repo = "opendatahub-io/opendatahub-operator"
                 operator_fork_url = f"{fork_org}/opendatahub-operator"
                 print(f"📋 Setting up standard opendatahub-operator: {operator_repo}")
-                
+
             try:
                 if operator_from_additional:
                     # Clone directly from source repository (no forking for additional repos)
@@ -222,19 +222,19 @@ def cmd_clone_forks(args):
 
                 # Setup operator repository 
                 repo_path = Path(result["local_path"])
-                
+
                 if operator_from_additional:
                     # Additional repo setup - already cloned from source, no upstream needed
                     print(f"  🔄 Setting up operator from additional repository...")
-                    
+
                     if branch:
                         # Specific branch requested - fetch and checkout from origin
                         print(f"  🔄 Setting up specific branch: {branch}")
-                        
+
                         try:
                             # Fetch from origin to get latest branches
                             gh._run_command(["git", "fetch", "origin"], cwd=repo_path)
-                            
+
                             # Try to checkout the branch
                             gh._run_command(["git", "checkout", branch], cwd=repo_path)
                             print(f"    ✅ Checked out branch: {branch}")
@@ -252,13 +252,13 @@ def cmd_clone_forks(args):
                         )
                         current_branch = current_branch_result.stdout.strip()
                         print(f"  ✅ Using current branch: {current_branch}")
-                        
+
                 else:
                     # Standard operator - full setup with upstream and feature branches
                     print(f"  🔄 Setting up upstream and feature branch...")
                     upstream_url = f"https://github.com/{operator_repo}"
                     gh.setup_upstream(repo_path, upstream_url)
-                    
+
                     feature_branch = gh.get_branch_name()
                     base_branch = "main"
 
@@ -333,17 +333,17 @@ def cmd_clone_forks(args):
                         target_branch = operator_from_additional['branch']
                         source_repo = operator_from_additional['source_repo']
                         print(f"    🔄 Setting up upstream for target branch: {target_branch}")
-                        
+
                         # Set up upstream to source repository
                         upstream_url = f"https://github.com/{source_repo}"
                         try:
                             gh.setup_upstream(operator_local_path, upstream_url)
-                            
+
                             current_branch_result = gh._run_command(
                                 ["git", "branch", "--show-current"], cwd=operator_local_path
                             )
                             current_branch = current_branch_result.stdout.strip()
-                            
+
                             if current_branch != target_branch:
                                 try:
                                     # Fetch from upstream and checkout branch
@@ -361,7 +361,7 @@ def cmd_clone_forks(args):
                                     print(f"    ✅ Updated from upstream/{target_branch}")
                                 except Exception as pull_error:
                                     print(f"    ⚠️  Could not pull from upstream: {pull_error}")
-                                    
+
                         except Exception as upstream_error:
                             print(f"    ⚠️  Could not set up upstream: {upstream_error}")
                     else:
@@ -371,7 +371,7 @@ def cmd_clone_forks(args):
                         )
                         current_branch = current_branch_result.stdout.strip()
                         print(f"    ✅ Using current branch: {current_branch} (no upstream setup)")
-                        
+
                 else:
                     # For standard repo, use feature branch workflow
                     feature_branch = gh.get_branch_name()
