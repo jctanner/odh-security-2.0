@@ -1,3 +1,7 @@
+# Getting Started
+
+## Prepare your machine to use this tool
+
 Install https://cli.github.com/ as the code will use that for github + git operations.
 
 ```
@@ -12,6 +16,8 @@ pip install -r requirements.txt
 ```
 echo $TOKEN > .github_token
 ```
+
+## Get all the source repos cloned to your machine
 
 ### create all the clones
 
@@ -29,6 +35,8 @@ This is an important step to follow if you want to use the manifests from your a
 ./tool.py workflow --name=manifests --exec
 ```
 
+## OPTION A: run the operator locally
+
 ### do all the pre-deploy stuff
 ```
 ./tool.py workflow --name=pre-deploy --exec
@@ -39,6 +47,25 @@ This is an important step to follow if you want to use the manifests from your a
 cd src/opendatahub-operator
 make run-nowebhook
 ```
+
+## OPTION B: make an operator image and deploy it
+
+### build the image
+```
+./tool.py workflow --name=image_build --exec
+```
+
+### push the image
+```
+./tool.py workflow --name=image_push --exec
+```
+
+### deploy the image
+```
+./tool.py workflow --name=image_deploy --exec
+```
+
+## Create your dsci and dsc
 
 ### create the dsci
 ```
