@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        env:
+{% for env_var in custom_env_vars | default([]) %}
+        - name: {{ env_var.name }}
+          value: "{{ env_var.value }}"
+{% endfor %}

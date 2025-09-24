@@ -1,0 +1,55 @@
+# Comprehensive mapping of component names to their RELATED_IMAGE environment variables
+# Add new components here as needed
+
+image_mappings:
+  # Dashboard components
+  odh-dashboard:
+    env_var: "RELATED_IMAGE_ODH_DASHBOARD_IMAGE"
+    variable_name: "dashboard_image_spec"
+    
+  # Model serving components  
+  model-controller:
+    env_var: "RELATED_IMAGE_ODH_MODEL_CONTROLLER_IMAGE"
+    variable_name: "model_controller_image_spec"
+    
+  kserve-controller:
+    env_var: "RELATED_IMAGE_ODH_KSERVE_CONTROLLER_IMAGE"
+    variable_name: "kserve_controller_image_spec"
+    
+  modelmesh-controller:
+    env_var: "RELATED_IMAGE_ODH_MODELMESH_CONTROLLER_IMAGE"
+    variable_name: "modelmesh_controller_image_spec"
+    
+  # Training components
+  training-operator:
+    env_var: "RELATED_IMAGE_ODH_TRAINING_OPERATOR_IMAGE"
+    variable_name: "training_operator_image_spec"
+    
+  # Ray components  
+  ray-operator:
+    env_var: "RELATED_IMAGE_ODH_KUBERAY_OPERATOR_CONTROLLER_IMAGE"
+    variable_name: "ray_operator_image_spec"
+    
+  # Data science pipelines
+  data-science-pipelines:
+    env_var: "RELATED_IMAGE_ODH_DATA_SCIENCE_PIPELINES_OPERATOR_CONTROLLER_IMAGE"
+    variable_name: "data_science_pipelines_image_spec"
+    
+  # Workbenches/Notebooks
+  odh-notebook-controller:
+    env_var: "RELATED_IMAGE_ODH_NOTEBOOK_CONTROLLER_IMAGE"
+    variable_name: "notebook_controller_image_spec"
+    
+  # Model registry
+  model-registry:
+    env_var: "RELATED_IMAGE_ODH_MODEL_REGISTRY_IMAGE"
+    variable_name: "model_registry_image_spec"
+    
+  # TrustyAI
+  trustyai:
+    env_var: "RELATED_IMAGE_ODH_TRUSTYAI_SERVICE_IMAGE"
+    variable_name: "trustyai_image_spec"
+    
+  # Add more components as needed...
+  # feast-operator:
+  #   env_var: "RELATED_IMAGE_ODH_FEAST_OPERATOR_IMAGE"
