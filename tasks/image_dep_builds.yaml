@@ -1,0 +1,40 @@
+- debug: var=build_dependencies
+
+- block:
+    - name: Build odh-dashboard image
+      block:
+        - set_fact:
+            dashboard_image_spec: "{{ registry_url + '/' + registry_namespace + '/odh-dashboard:' + registry_tag }}"
+
+        - name: Build odh-dashboard container image
+          live_shell:
+            cmd: "podman build -t odh-dashboard:latest -f Dockerfile ."
+            chdir: "{{ project_root }}/src/odh-dashboard"
+          register: dashboard_build_result
+
+        - name: Display dashboard build results
+          debug:
+            msg: "Dashboard build completed with return code: {{ dashboard_build_result.rc }}"
+          when: dashboard_build_result is defined
+
+        - name: Tag odh-dashboard image for registry
+          live_shell:
+            cmd: "podman tag odh-dashboard:latest {{ dashboard_image_spec }}"
+
+        - name: Push odh-dashboard image to registry
+          live_shell:
+            cmd: "podman push {{ dashboard_image_spec }}"
+
+        - name: Check if params.env file exists
+          stat:
+            path: "{{ project_root }}/src/odh-dashboard/manifests/odh/params.env"
+          register: params_file_stat
+
+        - name: Update odh dashboard image spec in params.env
+          lineinfile:
+            path: "{{ project_root }}/src/odh-dashboard/manifests/odh/params.env"
+            regexp: '^odh-dashboard-image='
+            line: "odh-dashboard-image={{ dashboard_image_spec }}"
+          when: params_file_stat.stat.exists
+
+      when: "'odh-dashboard' in build_dependencies"
