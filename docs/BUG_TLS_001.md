@@ -1,12 +1,5 @@
 # BUGS_TLS_001: TLS Certificate Verification in kube-auth-proxy
 
-**Status**: Resolved  
-**Date**: 2025-09-29  
-**Component**: kube-auth-proxy  
-**Severity**: Medium (Configuration Issue)
-
----
-
 ## Summary
 
 kube-auth-proxy's OpenShift provider may fail to verify TLS certificates when connecting to OAuth servers on managed OpenShift clusters (ROSA, ARO, etc.) that use public CA certificates (e.g., Let's Encrypt). The issue stems from the provider's default behavior of only trusting the Kubernetes service account CA, which doesn't include public CAs.
