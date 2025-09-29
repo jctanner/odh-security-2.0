@@ -6,15 +6,15 @@ metadata:
   ownerReferences:
   - apiVersion: v1
     kind: Service
-    name: odh-gateway-service
-    uid: "20ee40fe-4741-4235-a4c0-49e9045e7d07"
+    name: data-science-gateway-data-science-gateway-class
+    uid: "c639afab-0309-4b0a-ad11-15a61411d8a0"
     controller: true
     blockOwnerDeletion: true
 spec:
-  host: odh-gateway.apps-crc.testing
+  host: data-science-gateway.apps-crc.testing
   to:
     kind: Service
-    name: odh-gateway-service
+    name: data-science-gateway-data-science-gateway-class
     weight: 100
   port:
     targetPort: 443
