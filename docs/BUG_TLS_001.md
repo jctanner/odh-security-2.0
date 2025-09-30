@@ -2,7 +2,11 @@
 
 ## Summary
 
-kube-auth-proxy's OpenShift provider may fail to verify TLS certificates when connecting to OAuth servers on managed OpenShift clusters (ROSA, ARO, etc.) that use public CA certificates (e.g., Let's Encrypt). The issue stems from the provider's default behavior of only trusting the Kubernetes service account CA, which doesn't include public CAs.
+kube-auth-proxy's OpenShift provider may fail to verify TLS certificates when connecting to OAuth servers on managed OpenShift clusters (ROSA, ARO, etc.) that use Let's Encrypt certificates. The issue occurs when:
+1. The OAuth server hostname doesn't match the wildcard certificate in the service account CA bundle (e.g., `oauth.cluster.com` vs `*.apps.rosa.cluster.com`)
+2. The service account CA bundle is missing the ISRG Root X1 root certificate needed to validate Let's Encrypt certificate chains
+
+Some ROSA clusters work without the fix due to lucky wildcard domain matches that enable direct trust without chain validation.
 
 ---
 
@@ -23,8 +27,8 @@ The application supports three TLS configuration modes:
 
 #### 2. OpenShift Provider Auto-Detection
 - Automatically loads `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`
-- Works for: Kubernetes API and OAuth routes signed by the same CA
-- Fails for: OAuth routes using different CAs (e.g., Let's Encrypt)
+- Works for: Kubernetes API and OAuth routes signed by the same CA, or OAuth certs directly in the bundle
+- May fail for: OAuth routes requiring Let's Encrypt chain validation when ISRG Root X1 is missing
 
 **Code Reference** (`src/kube-auth-proxy/providers/openshift.go:362-414`):
 ```go
@@ -128,16 +132,17 @@ Post "https://oauth.j7g4p9x9d6e0u1j.vzrg.p3.openshiftapps.com:443/oauth/token":
 tls: failed to verify certificate: x509: certificate signed by unknown authority
 ```
 
-**Root Cause:**
-- Service account CA bundle contains Let's Encrypt intermediate (R13)
-- But it's missing the **ISRG Root X1** root certificate
-- The R13 intermediate itself is signed by ISRG Root X1
-- Without the root, Go cannot establish a complete trust chain
-- OAuth discovery works (internal K8s API), but OAuth token redemption fails (external OAuth server)
+**Root Cause (Two Factors):**
 
-**Important Note:**
+1. **OAuth Domain Mismatch**: OAuth hostname (`oauth.j7g4p9x9d6e0u1j...`) doesn't match the ingress wildcard (`*.apps.rosa.j7g4p9x9d6e0u1j...`) in the CA bundle
+   - Cannot use direct trust → must validate via certificate chain
 
-Even though the service account CA bundle includes Let's Encrypt intermediate certificates (R13), it's missing the root certificate (ISRG Root X1) needed to complete the trust chain.
+2. **Missing Root CA**: Service account CA bundle contains Let's Encrypt intermediate (R12) but is missing **ISRG Root X1** root certificate
+   - R12 intermediate is signed by ISRG Root X1
+   - Without the root, Go cannot establish a complete trust chain
+   - Chain validation fails → TLS error
+
+**Result**: OAuth discovery works (internal K8s API), but OAuth token redemption fails (external OAuth server with Let's Encrypt cert).
 
 **Failing ROSA cluster (Santiago - `j7g4p9x9d6e0u1j.vzrg.p3.openshiftapps.com`):**
 
@@ -593,43 +598,53 @@ This flag:
 
 ## Why Some ROSA Clusters Work Without the Flag
 
-### Root Cause: Service Account CA Bundle Variance
+### Root Cause: OAuth Domain Architecture + Wildcard Certificate Matching
 
-**Confirmed via testing:** ROSA clusters have different CA bundle configurations.
+**Confirmed via testing:** ROSA clusters work or fail based on whether the OAuth hostname matches the wildcard certificate in the service account CA bundle.
 
 **Test Performed:**
 ```bash
-# On working ROSA cluster:
+# On Jtanner ROSA cluster (WORKS):
 curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://oauth.jtanner-oauth.937s.p3.openshiftapps.com
-# Result: 403 Forbidden (TLS validated successfully)
+# Result: 403 Forbidden (TLS validated successfully via direct trust)
 
-# On failing ROSA cluster:
-curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://oauth.other-cluster.openshiftapps.com
+# On Santiago ROSA cluster (FAILS):
+curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://oauth.j7g4p9x9d6e0u1j.vzrg.p3.openshiftapps.com
 # Result: SSL certificate problem: unable to get local issuer certificate
 ```
 
-**Explanation:**
-- **Some ROSA clusters** inject public root CAs (including Let's Encrypt) into the service account CA bundle
-- **Other ROSA clusters** only include the Kubernetes API CA in the service account bundle
-- This variation depends on cluster version, configuration, or deployment method
+**Real Explanation:**
 
-**Service Account CA Bundle Contents:**
+**All tested ROSA clusters** have the same CA bundle structure:
+- OpenShift internal CA (root-ca)
+- Wildcard ingress certificate for `*.apps.rosa.<cluster-id>.openshiftapps.com` (Let's Encrypt intermediate)
+- Let's Encrypt intermediate certificate (R10, R11, R12, or R13) signed by ISRG Root X1
+- **Missing**: ISRG Root X1 root certificate
 
-| Cluster Type | CA Bundle Contents | Works Without Flag? |
-|--------------|-------------------|---------------------|
-| CRC | K8s API CA + Ingress CA | ✅ Yes |
-| ROSA (variant 1) | K8s API CA + Public CAs | ✅ Yes |
-| ROSA (variant 2) | K8s API CA only | ❌ No |
-| ARO | K8s API CA only (typical) | ❌ No |
+**The Key Difference - OAuth Domain Architecture:**
+
+| Scenario | OAuth Hostname | Wildcard in Bundle | Match? | Trust Method | Result |
+|----------|----------------|-------------------|--------|--------------|--------|
+| **Jtanner** | `oauth.jtanner-oauth.937s...` | `*.apps.rosa.jtanner-oauth.937s...` | ✅ Match | Direct trust (cert in bundle) | ✅ Works |
+| **Santiago** | `oauth.j7g4p9x9d6e0u1j.vzrg...` | `*.apps.rosa.j7g4p9x9d6e0u1j.vzrg...` | ❌ No match | Chain validation needed | ❌ Fails |
+| **Gowtham** | `oauth.gowtham-rosa419.q8mg...` | `*.apps.rosa.gowtham-rosa419.q8mg...` | ❌ No match | Chain validation needed | ✅ Works (has flag) |
+
+**Why Wildcard Matching Matters:**
+- When OAuth hostname matches the wildcard, Go trusts the certificate **directly** (it's in the CA bundle)
+- No need to validate the Let's Encrypt chain → missing ISRG Root X1 doesn't matter
+- When OAuth hostname doesn't match, Go must validate via the Let's Encrypt chain → requires ISRG Root X1 → fails
+
+**This is not a "CA bundle variance" between clusters - it's an OAuth domain naming architecture difference!**
 
 ### Why You Should Still Use the Flag
 
-Even if your current cluster works without it:
+Even if your current cluster works without it (like Jtanner):
 
-✅ **Future-proof**: Works across all OpenShift versions and configurations  
+✅ **Not architecture-dependent**: Works regardless of OAuth domain naming  
+✅ **Future-proof**: OAuth domain architecture may change during upgrades  
 ✅ **Consistent**: Same behavior on CRC, ROSA, ARO, self-hosted  
 ✅ **Explicit**: Makes the trust policy clear and intentional  
-✅ **Safe**: Tested and confirmed to work on all cluster types  
+✅ **Safe**: Tested and confirmed to work on all cluster types (including Gowtham)  
 ✅ **No downside**: Only adds CAs, doesn't reduce security
 
 ## Related Issues
@@ -661,12 +676,10 @@ Even if your current cluster works without it:
   - **Gowtham cluster proves the fix works**: Same architecture as Santiago (no wildcard match), but works with `--use-system-trust-store=true`
   - Removed previous speculative explanations - now have definitive root cause with live validation
 
-- **2025-09-30**: Updated with ROSA cluster variance findings
-  - **Root cause confirmed**: Service account CA bundle contents vary across ROSA clusters
-  - **Tested on working ROSA cluster**: Service account CA includes Let's Encrypt CA
-  - **Tested on failing ROSA cluster**: Service account CA only includes Kubernetes API CA
-  - Documented cluster configuration variance
-  - Reinforced recommendation to use `--use-system-trust-store=true` for consistency
+- **2025-09-30 (Earlier)**: Initial investigation into ROSA cluster variance
+  - **Initial hypothesis**: Service account CA bundle contents vary across ROSA clusters
+  - **Later corrected**: All ROSA clusters have similar bundles, but OAuth domain architecture differs
+  - This hypothesis was replaced by the wildcard matching discovery (see Final Update above)
 
 - **2025-09-29**: Initial documentation
   - Identified issue on managed clusters with Let's Encrypt
