@@ -414,6 +414,44 @@ Look for:
 - ✅ `--use-system-trust-store=true` (for managed clusters)
 - ❌ `--ssl-insecure-skip-verify` (should never be present in production)
 
+### 3b. Automated Go Test (Simulates Exact kube-auth-proxy Behavior)
+
+We created a Go test tool that simulates the exact TLS behavior of kube-auth-proxy, including OAuth discovery from the Kubernetes API. This tool is available at `test-scripts/test_tls_connect.go`.
+
+**Transfer and run the test:**
+```bash
+# Compile static binary
+cd test-scripts
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o test-tls-connect test_tls_connect.go
+
+# Run on cluster (automatically discovers OAuth URL)
+oc exec -i -n openshift-ingress deployment/kube-auth-proxy -- sh -c \
+  "cat > /tmp/test-tls-connect && chmod +x /tmp/test-tls-connect && /tmp/test-tls-connect" \
+  < test-tls-connect
+```
+
+**What it tests:**
+1. **Test 1: Service Account CA Only** - Simulates default kube-auth-proxy behavior
+2. **Test 2: System Trust Store + Service Account CA** - Simulates `--use-system-trust-store=true`
+3. **Test 3: System Trust Store Only** - For comparison with curl behavior
+
+**Live Test Results (2025-09-30):**
+
+| Cluster | Test 1: SA CA Only | Test 2: SA CA + System | Test 3: System Only | Analysis |
+|---------|-------------------|----------------------|-------------------|----------|
+| CRC | ✅ SUCCESS | ✅ SUCCESS | ❌ FAIL | Internal CA in bundle |
+| Santiago | ❌ **FAIL** | ✅ SUCCESS | ✅ SUCCESS | Needs chain validation, missing root |
+| Jtanner | ✅ SUCCESS | ✅ SUCCESS | ✅ SUCCESS | Wildcard match = direct trust |
+| Gowtham | ❌ **FAIL** | ✅ SUCCESS | ✅ SUCCESS | Same as Santiago, has fix in prod |
+
+**Key Findings:**
+- Santiago and Gowtham both **fail Test 1** (OAuth domain doesn't match wildcard → needs Let's Encrypt chain validation → missing ISRG Root X1)
+- Jtanner **passes Test 1** (OAuth cert matches wildcard in bundle → direct trust, no chain validation needed)
+- CRC **passes Test 1** (internal CA covers all cluster endpoints)
+- **All clusters pass Test 2** → `--use-system-trust-store=true` is the universal solution
+
+This definitively proves our root cause analysis and validates the fix.
+
 ### 4. Check Logs
 
 Monitor kube-auth-proxy logs for TLS errors:
@@ -428,10 +466,37 @@ Look for:
 - ✅ `Auto-discovered LoginURL:` (indicates successful OAuth discovery)
 - ✅ `Authenticated via OAuth2:` (indicates successful authentication)
 
+**Example of failure (Santiago cluster before fix):**
+```
+[2025/09/29 22:49:08] Auto-discovered LoginURL: https://oauth.j7g4p9x9d6e0u1j.vzrg.p3.openshiftapps.com:443/oauth/authorize
+[2025/09/29 22:49:08] Auto-discovered RedeemURL: https://oauth.j7g4p9x9d6e0u1j.vzrg.p3.openshiftapps.com:443/oauth/token
+[2025/09/29 22:49:20] Error redeeming code during OAuth2 callback: Post "https://oauth.j7g4p9x9d6e0u1j.vzrg.p3.openshiftapps.com:443/oauth/token": tls: failed to verify certificate: x509: certificate signed by unknown authority
+```
+
+**Example of success (Gowtham cluster with fix):**
+```
+[2025/09/29 23:16:28] OAuthProxy configured for OpenShift OAuth Client ID: odh
+# No TLS errors in logs
+```
+
 ### 5. Verify `--use-system-trust-store=true` Works with Internal CAs
 
-Test that the flag works on CRC/self-hosted clusters:
+The flag is safe for all cluster types, including CRC and self-hosted OpenShift with internal CAs.
 
+**Verified by Go test on CRC cluster:**
+```bash
+# Test Results on CRC (internal self-signed CA):
+Test 1: SA CA Only              → ✅ SUCCESS
+Test 2: SA CA + System Store    → ✅ SUCCESS  
+Test 3: System Store Only       → ❌ FAIL (expected - self-signed not in system trust)
+```
+
+This proves that adding `--use-system-trust-store=true` on CRC:
+- ✅ Still validates internal cluster certificates (service account CA is added to the pool)
+- ✅ Adds no negative side effects
+- ✅ Works identically to default behavior on CRC
+
+**To apply the fix:**
 ```bash
 # Add the flag to your deployment
 oc patch deployment kube-auth-proxy -n openshift-ingress --type=json \
@@ -446,10 +511,6 @@ oc logs deployment/kube-auth-proxy -n openshift-ingress --tail=20 | grep -E "Aut
 # Expected output:
 # ✅ Auto-discovered LoginURL: https://oauth-openshift.apps-crc.testing/oauth/authorize
 # ✅ Auto-discovered RedeemURL: https://oauth-openshift.apps-crc.testing/oauth/token
-
-# Test authentication flow
-curl -k -I https://your-gateway.apps-crc.testing/
-# Expected: 302 redirect to OAuth server (proves TLS validation works)
 ```
 
 ---
@@ -659,7 +720,7 @@ Even if your current cluster works without it (like Jtanner):
 
 ## Changelog
 
-- **2025-09-30 (Final Update)**: Root cause definitively identified
+- **2025-09-30 (Final Update)**: Root cause definitively identified and validated
   - **Key Discovery**: Working cluster has OAuth cert **directly in CA bundle** (wildcard match)
   - **Failing cluster**: OAuth hostname doesn't match bundle wildcard → requires chain validation
   - **Root cause**: Missing ISRG Root X1 in service account CA bundle prevents chain validation
@@ -669,11 +730,19 @@ Even if your current cluster works without it (like Jtanner):
     - Jtanner (works - lucky wildcard match)
     - Gowtham (works - has flag, demonstrates fix)
   - Created `test-scripts/list-ca-issuers` and `test-scripts/verify-root-ca` Go tools for CA analysis
+  - **Created `test-scripts/test_tls_connect.go`** - Go tool that simulates exact kube-auth-proxy TLS behavior
+    - Performs OAuth discovery from Kubernetes API (just like kube-auth-proxy)
+    - Tests 3 scenarios: SA CA only, SA CA + System, System only
+    - Ran live on all 4 clusters - results definitively prove our analysis
+    - Santiago & Gowtham: FAIL with SA CA only (need chain validation, missing root)
+    - Jtanner: SUCCESS with SA CA only (wildcard match = direct trust)
+    - CRC: SUCCESS with SA CA only (internal CA in bundle)
+    - ALL clusters: SUCCESS with SA CA + System (universal fix validated)
   - All ROSA clusters have different Let's Encrypt intermediates (R10, R11, R12, R13)
   - All ROSA clusters missing ISRG Root X1 root certificate
   - Confirmed all Let's Encrypt intermediates (R10-R13) are signed by ISRG Root X1
   - Clarified that wildcard domain patterns determine whether direct trust or chain validation is needed
-  - **Gowtham cluster proves the fix works**: Same architecture as Santiago (no wildcard match), but works with `--use-system-trust-store=true`
+  - **Go simulation definitively proves `--use-system-trust-store=true` is the universal fix**
   - Removed previous speculative explanations - now have definitive root cause with live validation
 
 - **2025-09-30 (Earlier)**: Initial investigation into ROSA cluster variance
