@@ -51,6 +51,7 @@ build:
   manifests_only: false
 
   build_dependencies:
+    - kube-auth-proxy
     - odh-dashboard
     - odh-notebook-controller
 
