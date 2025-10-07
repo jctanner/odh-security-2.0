@@ -4,6 +4,8 @@
 
 The kube-auth-proxy currently rejects OpenShift service account bearer tokens, preventing API clients from authenticating with standard Kubernetes/OpenShift authentication mechanisms. While cookie-based OAuth authentication works correctly for browser-based users, programmatic access using bearer tokens fails.
 
+**Important Note on JWT Security**: JWTs ARE fully validated by the proxy with comprehensive OIDC verification (signature, expiry, issuer, audience). The problem is NOT weak validation—it's that valid OpenShift tokens (format: `sha256~...`) are rejected before validation because they don't match JWT format (format: `eyJ...`). This document proposes adding support for non-JWT bearer tokens without weakening the existing strong JWT validation.
+
 ## Current Behavior
 
 ### Working: Cookie-Based Authentication
@@ -59,6 +61,59 @@ func (j *jwtSessionLoader) findTokenFromHeader(header string) (string, error) {
 
 The regex check at line 117 fails for OpenShift tokens, causing immediate rejection before any validation or pass-through logic can occur.
 
+### JWT Validation Process (When Token Passes Regex)
+
+**Important**: JWTs that pass the regex check ARE fully validated. The validation is comprehensive and includes:
+
+#### 1. Format Check (`jwt_session.go:117`)
+```go
+if tokenType == "Bearer" && j.jwtRegex.MatchString(token) {
+    return token, nil  // Pass to validation
+}
+```
+
+#### 2. OIDC Verification (`pkg/providers/oidc/verifier.go:46`)
+When a JWT passes format check, it undergoes full OIDC validation via `github.com/coreos/go-oidc/v3/oidc`:
+
+```go
+func (v *idTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {
+    // Full OIDC library validation includes:
+    // - Signature verification against JWKS (public keys from issuer)
+    // - Expiration check (exp claim)
+    // - Not-before check (nbf claim)
+    // - Issuer validation (iss claim matches expected)
+    // - Claims parsing and validation
+    token, err := v.verifier.Verify(ctx, rawIDToken)
+    if err != nil {
+        return nil, fmt.Errorf("failed to verify token: %v", err)
+    }
+
+    // Additional custom audience validation
+    if isValidAudience, err := v.verifyAudience(token, claims); !isValidAudience {
+        return nil, err
+    }
+    
+    return token, err
+}
+```
+
+#### 3. Audience Validation (`pkg/providers/oidc/verifier.go:63-84`)
+Custom validation ensures the `aud` claim matches allowed audiences:
+- Client ID must match
+- Or one of the extra audiences must match
+
+#### Validation Summary Table
+
+| Token Type | Regex Check | OIDC Validation | Result |
+|------------|-------------|-----------------|--------|
+| Valid JWT | ✅ Pass | ✅ Full validation (signature, expiry, issuer, audience) | Authenticated |
+| Expired JWT | ✅ Pass | ❌ Fail (expiry check) | Rejected |
+| Invalid signature JWT | ✅ Pass | ❌ Fail (signature verification) | Rejected |
+| Wrong audience JWT | ✅ Pass | ❌ Fail (audience check) | Rejected |
+| OpenShift SA token | ❌ **Fail** | Never reached | **Rejected at format check** |
+
+**Key Insight**: The security posture for JWTs is strong. The problem is NOT that tokens are unvalidated—it's that valid OpenShift tokens are rejected before they can be processed at all.
+
 ### Current Configuration
 
 The kube-auth-proxy deployment includes relevant flags:
@@ -84,6 +139,8 @@ This issue prevents:
 ### Option 1: Pass-Through Mode for Non-JWT Bearer Tokens (Recommended)
 
 Add a new configuration flag to allow non-JWT bearer tokens to pass through to the upstream service without validation.
+
+**Key Design Principle**: This option preserves all existing JWT validation logic. JWTs continue to be fully validated at the proxy. Only non-JWT bearer tokens (which currently fail the format check) are passed through.
 
 #### Implementation
 
@@ -135,10 +192,12 @@ func (j *jwtSessionLoader) findTokenFromHeader(header string) (string, error) {
     if tokenType == "Bearer" {
         if j.jwtRegex.MatchString(token) {
             // Found a JWT as a bearer token
+            // This will still go through full OIDC validation (signature, expiry, etc.)
             return token, nil
         }
         
         // NEW: If pass-through mode is enabled, accept non-JWT tokens
+        // These will NOT be validated at the proxy - upstream must validate them
         if j.passThroughBearerTokens {
             return token, nil
         }
@@ -367,17 +426,64 @@ containers:
 
 ## Security Considerations
 
-### Threats
-1. **Malicious tokens**: Invalid tokens could reach upstream if not validated there
+### Current Security Posture
+
+**JWT Validation**: The proxy performs comprehensive validation of JWT tokens:
+- ✅ Cryptographic signature verification against issuer's JWKS
+- ✅ Expiration and not-before time checks
+- ✅ Issuer validation
+- ✅ Audience validation
+- ✅ Claims parsing and validation
+
+**Cookie Sessions**: OAuth cookie-based sessions are secure and fully validated.
+
+**OpenShift Tokens**: Currently rejected at format check (the problem this design addresses).
+
+### Threats with Pass-Through Mode
+
+1. **Malicious tokens**: Invalid OpenShift tokens could reach upstream if not validated there
 2. **Token theft**: Bearer tokens in headers could be logged or exposed
 3. **Authorization bypass**: If upstream doesn't validate, unauthorized access possible
+4. **Replay attacks**: Without validation, stolen tokens remain valid until upstream detects them
 
 ### Mitigations
-1. **Upstream validation mandatory**: Document requirement for upstream token validation
-2. **Secure logging**: Never log bearer token values
-3. **HTTPS only**: Enforce TLS for all proxy communications
-4. **Header sanitization**: Remove duplicate auth headers
-5. **Rate limiting**: Implement rate limits on token validation failures
+
+1. **Upstream validation mandatory**: 
+   - Document requirement for upstream token validation
+   - Upstream MUST use Kubernetes TokenReview API or similar
+   - Upstream MUST enforce RBAC based on validated identity
+
+2. **Secure logging**: 
+   - Never log bearer token values (only log token type/format)
+   - Redact Authorization headers in debug logs
+
+3. **HTTPS only**: 
+   - Enforce TLS for all proxy communications
+   - No plaintext token transmission
+
+4. **Header sanitization**: 
+   - Remove duplicate auth headers
+   - Normalize header forwarding
+
+5. **Rate limiting**: 
+   - Implement rate limits on authentication failures
+   - Detect and block brute force attempts
+
+6. **Monitoring**: 
+   - Alert on unusual patterns (many pass-through tokens)
+   - Track validation failures at upstream
+
+### Security Comparison: Current vs Pass-Through Mode
+
+| Scenario | Current Behavior | With Pass-Through Mode |
+|----------|------------------|------------------------|
+| Valid JWT | ✅ Validated at proxy | ✅ Validated at proxy (unchanged) |
+| Invalid JWT | ✅ Rejected at proxy | ✅ Rejected at proxy (unchanged) |
+| Valid OpenShift token | ❌ Rejected at proxy | ⚠️ Passed to upstream for validation |
+| Invalid OpenShift token | ❌ Rejected at proxy | ⚠️ Passed to upstream (rejected there) |
+| Cookie session | ✅ Validated at proxy | ✅ Validated at proxy (unchanged) |
+
+**Note**: Pass-through mode does NOT weaken JWT security. It only adds a path for non-JWT tokens to reach upstream services.
 
 ### Validation Points
 ```
