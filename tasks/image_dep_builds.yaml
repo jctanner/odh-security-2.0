@@ -5,6 +5,35 @@
     path: "{{ project_root }}/.tmp/custom-images.d"
     state: directory
 
+- name: Build kube-auth-proxy image
+  when: "'kube-auth-proxy' in build_dependencies"
+  block:
+    - set_fact:
+        kube_auth_proxy_image_spec: "{{ registry_url + '/' + registry_namespace + '/kube-auth-proxy:' + registry_tag }}"
+
+    - name: Build kube-auth-proxy container image
+      live_shell:
+        cmd: "podman build -t kube-auth-proxy:latest -f Dockerfile.redhat ."
+        chdir: "{{ project_root }}/src/kube-auth-proxy"
+      register: proxy_build_result
+
+    - name: Display proxy build results
+      debug:
+        msg: "Proxy build completed with return code: {{ proxy_build_result.rc }}"
+      when: proxy_build_result is defined
+
+    - name: Tag kube-auth-proxy image for registry
+      live_shell:
+        cmd: "podman tag kube-auth-proxy:latest {{ kube_auth_proxy_image_spec }}"
+
+    - name: Push kube-auth-proxy image to registry
+      live_shell:
+        cmd: "podman push {{ kube_auth_proxy_image_spec }}"
+
+    - name: Write kube-auth-proxy env var to temp file
+      copy:
+        dest: "{{ project_root }}/.tmp/custom-images.d/kube-auth-proxy.env"
+        content: "RELATED_IMAGE_ODH_KUBE_AUTH_PROXY_IMAGE={{ kube_auth_proxy_image_spec }}"
 
 - name: Build odh-dashboard image
   when: "'odh-dashboard' in build_dependencies"
